@@ -1,6 +1,3 @@
-#![feature(const_fn)]
-// FIXME: ^
-
 #[cfg(feature = "tls")]
 extern crate thread_local;
 
@@ -10,9 +7,7 @@ use thread_local::ThreadLocal;
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::{Once, ONCE_INIT};
-use std::cell::UnsafeCell;
 use std::sync::RwLock;
-use std::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
 
 #[cfg(feature = "tls")]
 struct LocalValue<T: Send + 'static> {
@@ -40,54 +35,36 @@ unsafe impl<T: Send + 'static> Sync for LocalValue<T> {  }
 #[cfg(feature = "tls")]
 unsafe impl<T: Send + 'static> Send for LocalValue<T> {  }
 
-static STATE_INIT: Once = ONCE_INIT;
-
 struct State {
-    initialized: AtomicBool,
-    map: UnsafeCell<*const RwLock<HashMap<TypeId, *mut u8>>>
+    map: RwLock<HashMap<TypeId, *mut u8>>
 }
 
 impl State {
     #[inline(always)]
-    pub fn ensure_initialized(&'static self) {
-        // This _should_ be a _faster_ fast path.
-        if self.initialized.load(Ordering::Relaxed) { return; }
-
-        unsafe {
-            STATE_INIT.call_once(|| {
-                *self.map.get() = Box::into_raw(Box::new(RwLock::new(HashMap::new())));
-            });
-        }
-
-        self.initialized.store(true, Ordering::Relaxed);
-    }
-
     pub fn set<T: Send + Sync + 'static>(&'static self, state: T) -> bool {
-        self.ensure_initialized();
         let type_id = TypeId::of::<T>();
 
-        unsafe {
-            if (**self.map.get()).read().unwrap().contains_key(&type_id) {
-                return false;
-            }
-
-            let state_entry = Box::into_raw(Box::new(state));
-            (**self.map.get()).write().unwrap().insert(type_id, state_entry as *mut u8);
+        if self.map.read().unwrap().contains_key(&type_id) {
+            return false;
         }
+
+        let state_entry = Box::into_raw(Box::new(state));
+        self.map.write().unwrap().insert(type_id, state_entry as *mut u8);
 
         true
     }
 
+    #[inline(always)]
     pub fn try_get<T: Send + Sync + 'static>(&'static self) -> Option<&'static T> {
-        self.ensure_initialized();
         let type_id = TypeId::of::<T>();
 
         unsafe {
-            (**self.map.get()).read().unwrap().get(&type_id) .map(|ptr| &*(*ptr as *mut T))
+            self.map.read().unwrap().get(&type_id).map(|ptr| &*(*ptr as *mut T))
         }
     }
 
     #[cfg(feature = "tls")]
+    #[inline(always)]
     pub fn set_local<T, F>(&'static self, state_init: F) -> bool
         where T: Send + 'static, F: Fn() -> T + 'static
     {
@@ -95,6 +72,7 @@ impl State {
     }
 
     #[cfg(feature = "tls")]
+    #[inline(always)]
     pub fn try_get_local<T: Send + 'static>(&'static self) -> Option<&'static T> {
         // TODO: This will take a lock on the HashMap unnecessarily. Ideally
         // we'd have a `HashMap` per thread mapping from TypeId to (T, F).
@@ -102,10 +80,19 @@ impl State {
     }
 }
 
-static mut STATE: State = State {
-    initialized: ATOMIC_BOOL_INIT,
-    map: UnsafeCell::new(0 as *mut RwLock<_>)
-};
+static STATE_INIT: Once = ONCE_INIT;
+static mut STATE: *const State = 0 as *const State;
+
+#[inline(always)]
+fn ensure_state_initialized() {
+    unsafe {
+        STATE_INIT.call_once(|| {
+            STATE = Box::into_raw(Box::new(State {
+                map: RwLock::new(HashMap::new()),
+            }));
+        });
+    }
+}
 
 /// Sets the global state for type `T` if it has not been set before.
 ///
@@ -123,9 +110,9 @@ static mut STATE: State = State {
 /// assert_eq!(state::set(MyState(AtomicUsize::new(0))), true);
 /// assert_eq!(state::set(MyState(AtomicUsize::new(1))), false);
 /// ```
-#[inline(always)]
 pub fn set<T: Send + Sync + 'static>(state: T) -> bool {
-    unsafe { STATE.set(state) }
+    ensure_state_initialized();
+    unsafe { (*STATE).set(state) }
 }
 
 /// Attempts to retrieve the global state for type `T`.
@@ -149,7 +136,8 @@ pub fn set<T: Send + Sync + 'static>(state: T) -> bool {
 /// ```
 #[inline(always)]
 pub fn try_get<T: Send + Sync + 'static>() -> Option<&'static T> {
-    unsafe { STATE.try_get::<T>() }
+    ensure_state_initialized();
+    unsafe { (*STATE).try_get::<T>() }
 }
 
 /// Retrieves the global state for type `T`.
@@ -170,9 +158,9 @@ pub fn try_get<T: Send + Sync + 'static>() -> Option<&'static T> {
 /// let my_state = state::get::<MyState>();
 /// assert_eq!(my_state.0.load(Ordering::Relaxed), 0);
 /// ```
-#[inline(always)]
 pub fn get<T: Send + Sync + 'static>() -> &'static T {
-    unsafe { STATE.try_get::<T>().expect("state:get(): value is not present") }
+    ensure_state_initialized();
+    unsafe { (*STATE).try_get::<T>().expect("state:get(): value is not present") }
 }
 
 /// Sets the thread-local state for type `T` if it has not been set before.
@@ -193,11 +181,11 @@ pub fn get<T: Send + Sync + 'static>() -> &'static T {
 /// assert_eq!(state::set_local(|| MyState(Cell::new(2))), false);
 /// ```
 #[cfg(feature = "tls")]
-#[inline(always)]
 pub fn set_local<T, F>(state_init: F) -> bool
     where T: Send + 'static, F: Fn() -> T + 'static
 {
-    unsafe { STATE.set_local::<T, F>(state_init) }
+    ensure_state_initialized();
+    unsafe { (*STATE).set_local::<T, F>(state_init) }
 }
 
 /// Attempts to retrieve the thread-local state for type `T`.
@@ -218,9 +206,9 @@ pub fn set_local<T, F>(state_init: F) -> bool
 /// assert_eq!(my_state.0.get(), 10);
 /// ```
 #[cfg(feature = "tls")]
-#[inline(always)]
 pub fn try_get_local<T: Send + 'static>() -> Option<&'static T> {
-    unsafe { STATE.try_get_local::<T>() }
+    ensure_state_initialized();
+    unsafe { (*STATE).try_get_local::<T>() }
 }
 
 /// Retrieves the thread-local state for type `T`.
@@ -244,7 +232,7 @@ pub fn try_get_local<T: Send + 'static>() -> Option<&'static T> {
 /// assert_eq!(my_state.0.get(), 10);
 /// ```
 #[cfg(feature = "tls")]
-#[inline(always)]
 pub fn get_local<T: Send + 'static>() -> &'static T {
-    unsafe { STATE.try_get_local::<T>().expect("state::get_local(): value is not present") }
+    ensure_state_initialized();
+    unsafe { (*STATE).try_get_local::<T>().expect("state::get_local(): value is not present") }
 }
