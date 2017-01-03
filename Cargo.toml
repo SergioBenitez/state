@@ -1,6 +1,10 @@
 [package]
 name = "state"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Sergio Benitez <sb@sergio.bz>"]
 
+[features]
+tls = ["thread_local"]
+
 [dependencies]
+thread_local = { version = "0.3", optional = true }

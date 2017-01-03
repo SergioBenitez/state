@@ -1,10 +1,10 @@
 # State
 
-A library to effortlessly and safely handle global state.
+A library for safe and effortless global and thread-local state management.
 
 ```rust
 extern crate state;
 
-state::put::<u32>(1);
-assert_eq!(state::get::<u32>(), 1);
+state::set(42u32);
+assert_eq!(state::get::<u32>(), 42);
 ```
