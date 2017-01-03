@@ -1,97 +1,23 @@
-#[cfg(feature = "tls")]
-extern crate thread_local;
+mod state;
 
-#[cfg(feature = "tls")]
-use thread_local::ThreadLocal;
-
-use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::{Once, ONCE_INIT};
 use std::sync::RwLock;
 
-#[cfg(feature = "tls")]
-struct LocalValue<T: Send + 'static> {
-    tls: ThreadLocal<T>,
-    init_fn: Box<Fn() -> T>
-}
-
-#[cfg(feature = "tls")]
-impl<T: Send + 'static> LocalValue<T> {
-    pub fn new<F: Fn() -> T + 'static>(init_fn: F) -> LocalValue<T> {
-        LocalValue {
-            tls: ThreadLocal::new(),
-            init_fn: Box::new(init_fn)
-        }
-    }
-
-    pub fn get<'r>(&'r self) -> &'r T {
-        self.tls.get_or(|| Box::new((self.init_fn)()))
-    }
-}
-
-#[cfg(feature = "tls")]
-unsafe impl<T: Send + 'static> Sync for LocalValue<T> {  }
-
-#[cfg(feature = "tls")]
-unsafe impl<T: Send + 'static> Send for LocalValue<T> {  }
-
-struct State {
-    map: RwLock<HashMap<TypeId, *mut u8>>
-}
-
-impl State {
-    #[inline(always)]
-    pub fn set<T: Send + Sync + 'static>(&'static self, state: T) -> bool {
-        let type_id = TypeId::of::<T>();
-
-        if self.map.read().unwrap().contains_key(&type_id) {
-            return false;
-        }
-
-        let state_entry = Box::into_raw(Box::new(state));
-        self.map.write().unwrap().insert(type_id, state_entry as *mut u8);
-
-        true
-    }
-
-    #[inline(always)]
-    pub fn try_get<T: Send + Sync + 'static>(&'static self) -> Option<&'static T> {
-        let type_id = TypeId::of::<T>();
-
-        unsafe {
-            self.map.read().unwrap().get(&type_id).map(|ptr| &*(*ptr as *mut T))
-        }
-    }
-
-    #[cfg(feature = "tls")]
-    #[inline(always)]
-    pub fn set_local<T, F>(&'static self, state_init: F) -> bool
-        where T: Send + 'static, F: Fn() -> T + 'static
-    {
-        self.set::<LocalValue<T>>(LocalValue::new(state_init))
-    }
-
-    #[cfg(feature = "tls")]
-    #[inline(always)]
-    pub fn try_get_local<T: Send + 'static>(&'static self) -> Option<&'static T> {
-        // TODO: This will take a lock on the HashMap unnecessarily. Ideally
-        // we'd have a `HashMap` per thread mapping from TypeId to (T, F).
-        self.try_get::<LocalValue<T>>().map(|value| value.get())
-    }
-}
+use state::State;
 
 static STATE_INIT: Once = ONCE_INIT;
 static mut STATE: *const State = 0 as *const State;
 
+// Initializes the `STATE` global variable. This _MUST_ be called before
+// accessing the variable!
 #[inline(always)]
-fn ensure_state_initialized() {
-    unsafe {
-        STATE_INIT.call_once(|| {
-            STATE = Box::into_raw(Box::new(State {
-                map: RwLock::new(HashMap::new()),
-            }));
-        });
-    }
+unsafe fn ensure_state_initialized() {
+    STATE_INIT.call_once(|| {
+        STATE = Box::into_raw(Box::new(State {
+            map: RwLock::new(HashMap::new()),
+        }));
+    });
 }
 
 /// Sets the global state for type `T` if it has not been set before.
@@ -111,8 +37,10 @@ fn ensure_state_initialized() {
 /// assert_eq!(state::set(MyState(AtomicUsize::new(1))), false);
 /// ```
 pub fn set<T: Send + Sync + 'static>(state: T) -> bool {
-    ensure_state_initialized();
-    unsafe { (*STATE).set(state) }
+    unsafe {
+        ensure_state_initialized();
+        (*STATE).set(state)
+    }
 }
 
 /// Attempts to retrieve the global state for type `T`.
@@ -136,8 +64,10 @@ pub fn set<T: Send + Sync + 'static>(state: T) -> bool {
 /// ```
 #[inline(always)]
 pub fn try_get<T: Send + Sync + 'static>() -> Option<&'static T> {
-    ensure_state_initialized();
-    unsafe { (*STATE).try_get::<T>() }
+    unsafe {
+        ensure_state_initialized();
+        (*STATE).try_get::<T>()
+    }
 }
 
 /// Retrieves the global state for type `T`.
@@ -159,8 +89,10 @@ pub fn try_get<T: Send + Sync + 'static>() -> Option<&'static T> {
 /// assert_eq!(my_state.0.load(Ordering::Relaxed), 0);
 /// ```
 pub fn get<T: Send + Sync + 'static>() -> &'static T {
-    ensure_state_initialized();
-    unsafe { (*STATE).try_get::<T>().expect("state:get(): value is not present") }
+    unsafe {
+        ensure_state_initialized();
+        (*STATE).try_get::<T>().expect("state:get(): absent type")
+    }
 }
 
 /// Sets the thread-local state for type `T` if it has not been set before.
@@ -182,10 +114,13 @@ pub fn get<T: Send + Sync + 'static>() -> &'static T {
 /// ```
 #[cfg(feature = "tls")]
 pub fn set_local<T, F>(state_init: F) -> bool
-    where T: Send + 'static, F: Fn() -> T + 'static
+    where T: Send + 'static,
+          F: Fn() -> T + 'static
 {
-    ensure_state_initialized();
-    unsafe { (*STATE).set_local::<T, F>(state_init) }
+    unsafe {
+        ensure_state_initialized();
+        (*STATE).set_local::<T, F>(state_init)
+    }
 }
 
 /// Attempts to retrieve the thread-local state for type `T`.
@@ -207,8 +142,10 @@ pub fn set_local<T, F>(state_init: F) -> bool
 /// ```
 #[cfg(feature = "tls")]
 pub fn try_get_local<T: Send + 'static>() -> Option<&'static T> {
-    ensure_state_initialized();
-    unsafe { (*STATE).try_get_local::<T>() }
+    unsafe {
+        ensure_state_initialized();
+        (*STATE).try_get_local::<T>()
+    }
 }
 
 /// Retrieves the thread-local state for type `T`.
@@ -233,6 +170,8 @@ pub fn try_get_local<T: Send + 'static>() -> Option<&'static T> {
 /// ```
 #[cfg(feature = "tls")]
 pub fn get_local<T: Send + 'static>() -> &'static T {
-    ensure_state_initialized();
-    unsafe { (*STATE).try_get_local::<T>().expect("state::get_local(): value is not present") }
+    unsafe {
+        ensure_state_initialized();
+        (*STATE).try_get_local::<T>() .expect("state::get_local(): absent type")
+    }
 }
