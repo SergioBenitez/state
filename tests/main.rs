@@ -1,5 +1,8 @@
 extern crate state;
 
+use std::thread;
+use std::cell::Cell;
+
 #[test]
 fn simple_set_get() {
     state::set(1u32);
@@ -10,6 +13,15 @@ fn simple_set_get() {
 fn dst_set_get() {
     state::set::<[u32; 4]>([1, 2, 3, 4u32]);
     assert_eq!(*state::get::<[u32; 4]>(), [1, 2, 3, 4]);
+}
+
+#[test]
+fn set_get_remote() {
+    thread::spawn(|| {
+        state::set(10isize);
+    }).join().unwrap();
+
+    assert_eq!(*state::get::<isize>(), 10);
 }
 
 #[test]
@@ -78,9 +90,6 @@ fn test_double_put_tls() {
 #[test]
 #[cfg(feature = "tls")]
 fn test_tls_really_is_tls() {
-    use ::std::cell::Cell;
-    use ::std::thread;
-
     state::set_local(|| Cell::new(0u32));
 
     let mut threads = vec![];
@@ -93,4 +102,17 @@ fn test_tls_really_is_tls() {
 
     threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>();
     assert_eq!(state::get_local::<Cell<u32>>().get(), 0);
+}
+
+#[test]
+#[cfg(feature = "tls")]
+fn test_tls_really_is_tls_take_2() {
+    thread::spawn(|| {
+        state::set_local(|| Cell::new(1i8));
+        state::get_local::<Cell<i8>>().set(2);
+
+        thread::spawn(|| {
+            assert_eq!(state::get_local::<Cell<i8>>().get(), 1);
+        }).join().expect("inner join");
+    }).join().expect("outer join");
 }
