@@ -5,6 +5,7 @@ authors = ["Sergio Benitez <sb@sergio.bz>"]
 description = """
 A library for safe and effortless global and thread-local state management.
 """
+documentation = "https://sergio.bz/rustdocs/state"
 repository = "https://github.com/SergioBenitez/rust-state"
 readme = "README.md"
 keywords = ["global", "state", "thread-local", "tls", "static"]
@@ -15,3 +16,11 @@ tls = ["thread_local"]
 
 [dependencies]
 thread_local = { version = "0.3", optional = true }
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[profile.bench]
+opt-level = 3
+lto = true
