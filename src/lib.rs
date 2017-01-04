@@ -6,7 +6,7 @@
 //! given type to be stored in global storage as well as _n_ instances of a
 //! given type to be stored in _n_ thread-local-storage slots. This makes
 //! `state` ideal for singleton instances, global configuration, and
-//! singly-initialized state.
+//! once-initialized state.
 //!
 //! ## Usage
 //!
@@ -29,7 +29,7 @@
 //!
 //! Global state is set via the [set](fn.set.html) function and retrieved via
 //! the [get](fn.get.html) function. The type of the value being set must be
-//! thread-safe and transferrable across thread boundaries. In other words, it
+//! thread-safe and transferable across thread boundaries. In other words, it
 //! must satisfy `Sync + Send + 'static`.
 //!
 //! ### Example
@@ -47,7 +47,7 @@
 //!
 //! Thread-local state is set via the [set_local](fn.set_local.html) function
 //! and retrieved via the [get_local](fn.get_local.html) function. The type of
-//! the value being set must be transferrable across thread boundaries but need
+//! the value being set must be transferable across thread boundaries but need
 //! not be thread-safe. In other words, it must satisfy `Send + 'static` but not
 //! necessarily `Sync`. Values retrieved from thread-local state are exactly
 //! that: local to the current thread. As such, you cannot use thread-local
@@ -144,9 +144,8 @@
 //! following implements this using `state`:
 //!
 //! ```rust
-//! use std::cell::Cell;
-//! use std::thread;
-//!
+//! # use std::cell::Cell;
+//! # use std::thread;
 //! struct InvokeCount(Cell<usize>);
 //!
 //! fn function_to_measure() {
@@ -182,7 +181,13 @@
 //! better than `lazy_static` when _many_ threads are used to access a global
 //! variable. Keep in mind that `state` allows global initialization at _any_
 //! point in the program, while `lazy_static` initialization must be declared
-//! apriori.
+//! a priori. In other words, `state`'s abilities are a superset of those in
+//! `lazy_static`.
+//!
+//! ## When To Use
+//!
+//! You should avoid using `state` as much as possible. Instead, prefer to pass
+//! state manually through your program.
 //!
 mod state;
 mod ident_hash;
