@@ -1,0 +1,47 @@
+With R/W Lock, Default Hasher
+
+running 3 tests
+test lazy_static_get ... bench:           1 ns/iter (+/- 0)
+test state_get       ... bench:          93 ns/iter (+/- 38)
+test state_local_get ... bench:         110 ns/iter (+/- 6)
+
+With R/W Lock, SeaHash
+
+running 3 tests
+test lazy_static_get ... bench:           1 ns/iter (+/- 0)
+test state_get       ... bench:          88 ns/iter (+/- 5)
+test state_local_get ... bench:         108 ns/iter (+/- 39)
+
+Without Lock, Default Hasher
+
+running 3 tests
+test lazy_static_get ... bench:           1 ns/iter (+/- 0)
+test state_get       ... bench:          20 ns/iter (+/- 1)
+test state_local_get ... bench:          30 ns/iter (+/- 2)
+
+Without Lock, SeaHash
+
+running 3 tests
+test lazy_static_get ... bench:           1 ns/iter (+/- 0)
+test state_get       ... bench:          17 ns/iter (+/- 1)
+test state_local_get ... bench:          29 ns/iter (+/- 3)
+
+With cmp_and_swap, SeaHash
+
+test lazy_static_get ... bench:           1 ns/iter (+/- 0)
+test state_get       ... bench:          24 ns/iter (+/- 1)
+test state_local_get ... bench:          34 ns/iter (+/- 13)
+
+With cmp_and_swap(usize), SeaHash, opt-level 3, lto
+
+running 3 tests
+test lazy_static_get ... bench:           1 ns/iter (+/- 0)
+test state_get       ... bench:          21 ns/iter (+/- 1)
+test state_local_get ... bench:          27 ns/iter (+/- 4)
+
+With cmp_and_swap(bool), SeaHash, opt-level 3, lto
+
+running 3 tests
+test lazy_static_get ... bench:           1 ns/iter (+/- 0)
+test state_get       ... bench:          21 ns/iter (+/- 1)
+test state_local_get ... bench:          28 ns/iter (+/- 2)

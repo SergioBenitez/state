@@ -1,0 +1,16 @@
+[package]
+name = "bench"
+version = "0.1.0"
+authors = ["Sergio Benitez <sb@sergio.bz>"]
+
+[dependencies]
+lazy_static = "*"
+state = { path = "../", features = ["tls"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[profile.bench]
+opt-level = 3
+lto = true

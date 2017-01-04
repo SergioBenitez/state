@@ -8,3 +8,4 @@ tls = ["thread_local"]
 
 [dependencies]
 thread_local = { version = "0.3", optional = true }
+seahash = "3"

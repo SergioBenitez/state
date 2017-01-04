@@ -1,8 +1,6 @@
 mod state;
 
-use std::collections::HashMap;
 use std::sync::{Once, ONCE_INIT};
-use std::sync::RwLock;
 
 use state::State;
 
@@ -14,9 +12,7 @@ static mut STATE: *const State = 0 as *const State;
 #[inline(always)]
 unsafe fn ensure_state_initialized() {
     STATE_INIT.call_once(|| {
-        STATE = Box::into_raw(Box::new(State {
-            map: RwLock::new(HashMap::new()),
-        }));
+        STATE = Box::into_raw(Box::new(State::new()));
     });
 }
 

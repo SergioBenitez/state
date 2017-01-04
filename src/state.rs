@@ -1,9 +1,13 @@
-#[cfg(feature = "tls")]
-extern crate thread_local;
+#[cfg(feature = "tls")] extern crate thread_local;
+extern crate seahash;
 
 use std::any::TypeId;
+use std::cell::UnsafeCell;
+use std::hash::BuildHasherDefault;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::HashMap;
-use std::sync::RwLock;
+
+use self::seahash::SeaHasher;
 
 #[cfg(feature = "tls")]
 use self::thread_local::ThreadLocal;
@@ -34,32 +38,61 @@ unsafe impl<T: Send + 'static> Sync for LocalValue<T> {}
 #[cfg(feature = "tls")]
 unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 
+const IDLE: usize = 0;
+const SETTING: usize = 1;
+const GETTING: usize = 2;
+
 pub struct State {
-    pub map: RwLock<HashMap<TypeId, *mut u8>>,
+    pub map: UnsafeCell<HashMap<TypeId, *mut u8, BuildHasherDefault<SeaHasher>>>,
+    pub state: AtomicUsize,
 }
 
 impl State {
+    pub fn new() -> State {
+        State {
+            map: UnsafeCell::new(HashMap::<_, _, _>::default()),
+            state: AtomicUsize::new(IDLE)
+        }
+    }
+
+    #[inline(always)]
+    fn change_state(&'static self, from: usize, to: usize) -> bool {
+        self.state.compare_and_swap(from, to, Ordering::SeqCst) == from
+    }
+
     #[inline(always)]
     pub fn set<T: Send + Sync + 'static>(&'static self, state: T) -> bool {
+        // Wait until we're idle.
+        while !self.change_state(IDLE, SETTING) {  }
+
         let type_id = TypeId::of::<T>();
+        let result = unsafe {
+            if (*self.map.get()).contains_key(&type_id) {
+                false
+            } else {
+                let state_entry = Box::into_raw(Box::new(state));
+                (*self.map.get()).insert(type_id, state_entry as *mut u8);
+                true
+            }
+        };
 
-        if self.map.read().unwrap().contains_key(&type_id) {
-            return false;
-        }
-
-        let state_entry = Box::into_raw(Box::new(state));
-        self.map.write().unwrap().insert(type_id, state_entry as *mut u8);
-
-        true
+        assert!(self.change_state(SETTING, IDLE));
+        result
     }
 
     #[inline(always)]
     pub fn try_get<T: Send + Sync + 'static>(&'static self) -> Option<&'static T> {
-        let type_id = TypeId::of::<T>();
+        // Wait until we're idle.
+        // FIXME: Allow concurrent gets!
+        while !self.change_state(IDLE, GETTING) {  }
 
-        unsafe {
-            self.map.read().unwrap().get(&type_id).map(|ptr| &*(*ptr as *mut T))
-        }
+        let type_id = TypeId::of::<T>();
+        let res = unsafe {
+            (*self.map.get()).get(&type_id).map(|ptr| &*(*ptr as *mut T))
+        };
+
+        assert!(self.change_state(GETTING, IDLE));
+        res
     }
 
     #[cfg(feature = "tls")]
