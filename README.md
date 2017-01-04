@@ -1,6 +1,6 @@
 # State
 
-A library for safe and effortless global and thread-local state management.
+A Rust library for safe and effortless global and thread-local state management.
 
 ```rust
 extern crate state;
