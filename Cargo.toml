@@ -6,7 +6,7 @@ description = """
 A library for safe and effortless global and thread-local state management.
 """
 documentation = "https://sergio.bz/rustdocs/state"
-repository = "https://github.com/SergioBenitez/rust-state"
+repository = "https://github.com/SergioBenitez/state"
 readme = "README.md"
 keywords = ["global", "state", "thread-local", "tls", "static"]
 license = "MIT/Apache-2.0"
