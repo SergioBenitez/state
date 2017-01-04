@@ -17,7 +17,7 @@ Include `state` in your `Cargo.toml` `[dependencies]`:
 
 ```toml
 [dependencies]
-state = "0.0.5"
+state = "0.1"
 ```
 
 Thread-local state management is not enabled by default. You can enable it
@@ -25,7 +25,7 @@ via the "tls" feature:
 
 ```toml
 [dependencies]
-state = { version = "0.0.5", features = ["tls"] }
+state = { version = "0.1", features = ["tls"] }
 ```
 
 ## License
