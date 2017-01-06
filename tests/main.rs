@@ -1,6 +1,8 @@
 extern crate state;
 
 use std::thread;
+
+#[cfg(feature = "tls")]
 use std::cell::Cell;
 
 #[test]

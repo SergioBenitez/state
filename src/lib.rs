@@ -71,8 +71,12 @@
 //! ```rust
 //! # struct T;
 //! # impl T { fn new() -> T { T } }
+//! # #[cfg(not(feature = "tls"))] fn test() { }
+//! # #[cfg(feature = "tls")] fn test() {
 //! state::set_local(|| T::new());
 //! state::get_local::<T>();
+//! # }
+//! # fn main() { test() }
 //! ```
 //!
 //! ## Use Cases
@@ -148,11 +152,15 @@
 //! # use std::thread;
 //! struct InvokeCount(Cell<usize>);
 //!
+//! # #[cfg(not(feature = "tls"))] fn function_to_measure() { }
+//! # #[cfg(feature = "tls")]
 //! fn function_to_measure() {
 //!     let count = state::get_local::<InvokeCount>();
 //!     count.0.set(count.0.get() + 1);
 //! }
 //!
+//! # #[cfg(not(feature = "tls"))] fn main() { }
+//! # #[cfg(feature = "tls")]
 //! fn main() {
 //!     // setup the initializer for thread-local state
 //!     state::set_local(|| InvokeCount(Cell::new(0)));
