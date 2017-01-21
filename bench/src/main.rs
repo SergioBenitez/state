@@ -1,4 +1,5 @@
 #![feature(test)]
+#![feature(const_fn)]
 
 extern crate test;
 extern crate state;
@@ -6,6 +7,8 @@ extern crate state;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+use std::cell::Cell;
+
 use test::Bencher;
 
 lazy_static! {
@@ -13,18 +16,42 @@ lazy_static! {
 }
 
 #[bench]
-fn state_get(b: &mut Bencher) {
-    state::set(AtomicUsize::new(0));
+fn container_get(b: &mut Bencher) {
+    static STATE: state::Container = state::Container::new();
+    STATE.set(AtomicUsize::new(0));
+
     b.iter(|| {
-        state::get::<AtomicUsize>().load(Ordering::Relaxed)
+        STATE.get::<AtomicUsize>().load(Ordering::Relaxed)
     });
 }
 
 #[bench]
-fn state_local_get(b: &mut Bencher) {
-    state::set_local(|| AtomicUsize::new(0));
+fn storage_get(b: &mut Bencher) {
+    static STORAGE: state::Storage<AtomicUsize> = state::Storage::new();
+
+    STORAGE.set(AtomicUsize::new(0));
     b.iter(|| {
-        state::get_local::<AtomicUsize>().load(Ordering::Relaxed)
+        test::black_box(STORAGE.get().load(Ordering::Relaxed))
+    });
+}
+
+#[bench]
+fn local_storage_get(b: &mut Bencher) {
+    static STORAGE: state::LocalStorage<Cell<usize>> = state::LocalStorage::new();
+
+    STORAGE.set(|| Cell::new(0));
+    b.iter(|| {
+        test::black_box(STORAGE.get().get())
+    });
+}
+
+#[bench]
+fn container_local_get(b: &mut Bencher) {
+    static STATE: state::Container = state::Container::new();
+    STATE.set_local(|| AtomicUsize::new(0));
+
+    b.iter(|| {
+        STATE.get_local::<AtomicUsize>().load(Ordering::Relaxed)
     });
 }
 
@@ -36,13 +63,15 @@ fn lazy_static_get(b: &mut Bencher) {
 }
 
 #[bench]
-fn state_get_many_threads(b: &mut Bencher) {
-    state::set(AtomicUsize::new(0));
+fn container_get_many_threads(b: &mut Bencher) {
+    static STATE: state::Container = state::Container::new();
+    STATE.set(AtomicUsize::new(0));
+
     b.iter(|| {
         let mut threads = vec![];
         for _ in 0..100 {
             threads.push(thread::spawn(|| {
-                state::get::<AtomicUsize>().load(Ordering::Relaxed)
+                STATE.get::<AtomicUsize>().load(Ordering::Relaxed)
             }));
         }
 
@@ -51,13 +80,15 @@ fn state_get_many_threads(b: &mut Bencher) {
 }
 
 #[bench]
-fn state_local_get_many_threads(b: &mut Bencher) {
-    state::set_local(|| AtomicUsize::new(0));
+fn container_local_get_many_threads(b: &mut Bencher) {
+    static STATE: state::Container = state::Container::new();
+    STATE.set_local(|| AtomicUsize::new(0));
+
     b.iter(|| {
         let mut threads = vec![];
         for _ in 0..100 {
             threads.push(thread::spawn(|| {
-                state::get_local::<AtomicUsize>().load(Ordering::Relaxed)
+                STATE.get_local::<AtomicUsize>().load(Ordering::Relaxed)
             }));
         }
 
@@ -72,6 +103,40 @@ fn lazy_static_get_many_threads(b: &mut Bencher) {
         for _ in 0..100 {
             threads.push(thread::spawn(|| {
                 test::black_box((*ATOMIC).load(Ordering::Relaxed))
+            }));
+        }
+
+        threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>()
+    });
+}
+
+#[bench]
+fn storage_get_many_threads(b: &mut Bencher) {
+    static STORAGE: state::Storage<AtomicUsize> = state::Storage::new();
+
+    STORAGE.set(AtomicUsize::new(0));
+    b.iter(|| {
+        let mut threads = vec![];
+        for _ in 0..100 {
+            threads.push(thread::spawn(|| {
+                test::black_box(STORAGE.get().load(Ordering::Relaxed))
+            }));
+        }
+
+        threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>()
+    });
+}
+
+#[bench]
+fn local_storage_get_many_threads(b: &mut Bencher) {
+    static STORAGE: state::LocalStorage<Cell<usize>> = state::LocalStorage::new();
+
+    STORAGE.set(|| Cell::new(0));
+    b.iter(|| {
+        let mut threads = vec![];
+        for _ in 0..100 {
+            threads.push(thread::spawn(|| {
+                test::black_box(STORAGE.get().get())
             }));
         }
 

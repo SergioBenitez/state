@@ -111,3 +111,9 @@ test state_get                    ... bench:          18 ns/iter (+/- 0)
 test state_get_many_threads       ... bench:   2,510,471 ns/iter (+/- 297,908)
 test state_local_get              ... bench:          28 ns/iter (+/- 1)
 test state_local_get_many_threads ... bench:   2,559,974 ns/iter (+/- 346,463)
+
+Using a 'Unique' key:
+test lazy_static_get              ... bench:           1 ns/iter (+/- 0)
+test lazy_static_get_many_threads ... bench:   2,517,430 ns/iter (+/- 41,669)
+test state_get                    ... bench:          27 ns/iter (+/- 9)
+test state_get_many_threads       ... bench:   2,519,271 ns/iter (+/- 38,549)

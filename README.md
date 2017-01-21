@@ -5,8 +5,10 @@ A Rust library for safe and effortless global and thread-local state management.
 ```rust
 extern crate state;
 
-state::set(42u32);
-assert_eq!(state::get::<u32>(), 42);
+static GLOBAL: state::Storage<u32> = state::Storage::new();
+
+GLOBAL.set(42);
+assert_eq!(*GLOBAL.get(), 42);
 ```
 
 See the [documentation](https://sergio.bz/rustdocs/state) for more.
@@ -17,15 +19,23 @@ Include `state` in your `Cargo.toml` `[dependencies]`:
 
 ```toml
 [dependencies]
-state = "0.1"
+state = "0.2"
 ```
 
 Thread-local state management is not enabled by default. You can enable it
-via the "tls" feature:
+via the `tls` feature:
 
 ```toml
 [dependencies]
-state = { version = "0.1", features = ["tls"] }
+state = { version = "0.2", features = ["tls"] }
+```
+
+This crate requires Rust nightly due to the instability of the `const_fn`
+feature. Ensure the feature is enabled by adding the following to your top-level
+crate attributes:
+
+```rust
+#![feature(const_fn)]
 ```
 
 ## License

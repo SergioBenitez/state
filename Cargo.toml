@@ -1,6 +1,6 @@
 [package]
 name = "state"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Sergio Benitez <sb@sergio.bz>"]
 description = """
 A library for safe and effortless global and thread-local state management.
@@ -8,7 +8,7 @@ A library for safe and effortless global and thread-local state management.
 documentation = "https://sergio.bz/rustdocs/state"
 repository = "https://github.com/SergioBenitez/state"
 readme = "README.md"
-keywords = ["global", "state", "thread-local", "tls", "static"]
+keywords = ["static", "tls", "state", "thread-local", "global"]
 license = "MIT/Apache-2.0"
 
 [features]
