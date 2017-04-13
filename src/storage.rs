@@ -155,6 +155,29 @@ impl<T: Send + Sync + 'static> Storage<T> {
         self.try_get()
             .expect("storage::get(): called get() before set()")
     }
+
+    /// Borrows the value in this storage location if has already been set. If
+    /// it has not, sets the value to the return value of `from` and return a
+    /// borrow to the storage location.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # #![feature(const_fn)]
+    /// # use state::Storage;
+    /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
+    ///
+    /// assert_eq!(*MY_GLOBAL.get_or_set(|| "Hello, world!"), "Hello, world!");
+    /// ```
+    #[inline]
+    pub fn get_or_set<F: Fn() -> T>(&self, from: F) -> &T {
+        if let Some(value) = self.try_get() {
+            value
+        } else {
+            self.set(from());
+            self.get()
+        }
+    }
 }
 
 unsafe impl<T: Send + Sync + 'static> Sync for Storage<T> {  }
