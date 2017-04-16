@@ -156,9 +156,8 @@ impl<T: Send + Sync + 'static> Storage<T> {
             .expect("storage::get(): called get() before set()")
     }
 
-    /// Borrows the value in this storage location if has already been set. If
-    /// it has not, sets the value to the return value of `from` and return a
-    /// borrow to the storage location.
+    /// If the storage location has not yet been set, it is set to the return
+    /// value of `from`. Returns a borrow to the value in this storage location.
     ///
     /// # Example
     ///
