@@ -191,3 +191,20 @@ impl<T: fmt::Debug + Send + Sync + 'static> fmt::Debug for Storage<T> {
         }
     }
 }
+
+impl<T: Send + Sync + 'static> From<T> for Storage<T> {
+    fn from(value: T) -> Storage<T> {
+        let storage = Storage::new();
+        assert!(storage.set(value));
+        storage
+    }
+}
+
+impl<T: Clone + Default + Send + Sync + 'static> Clone for Storage<T> {
+    fn clone(&self) -> Storage<T> {
+        match self.try_get() {
+            Some(val) => Storage::from(val.clone()),
+            None => Storage::from(T::default())
+        }
+    }
+}

@@ -22,16 +22,23 @@ impl Init {
         self.init_done.load(Ordering::Acquire)
     }
 
-    /// Mark this initialization as complete, unblocking all thread that may be
+    /// Mark this initialization as complete, unblocking all threads that may be
     /// waiting.
     #[inline(always)]
     pub fn mark_complete(&self) {
+        // If this is being called from outside of a `needed` block, we need to
+        // ensure that initialization is marked as started to avoid racing with
+        // future `needed` calls.
+        if !self.init_started.load(Ordering::Relaxed) {
+            self.init_started.store(true, Ordering::SeqCst);
+        }
+
         self.init_done.store(true, Ordering::SeqCst);
     }
 
     #[cold]
     #[inline(always)]
-    pub fn try_to_need_init(&self) -> bool {
+    fn try_to_need_init(&self) -> bool {
         // Quickly check if initialization has already started elsewhere.
         if self.init_started.load(Ordering::Relaxed) {
             // If it has, wait until it's finished before returning. Finishing
