@@ -19,7 +19,7 @@ Include `state` in your `Cargo.toml` `[dependencies]`:
 
 ```toml
 [dependencies]
-state = "0.2"
+state = "0.3"
 ```
 
 Thread-local state management is not enabled by default. You can enable it
@@ -27,15 +27,15 @@ via the `tls` feature:
 
 ```toml
 [dependencies]
-state = { version = "0.2", features = ["tls"] }
+state = { version = "0.3", features = ["tls"] }
 ```
 
-This crate requires Rust nightly due to the instability of the `const_fn`
-feature. Ensure the feature is enabled by adding the following to your top-level
-crate attributes:
+This crate requires Rust nightly due to the instability of the `const_fn` and
+`drop_types_in_const` features. Ensure the features are enabled by adding the
+following to your top-level crate attributes:
 
 ```rust
-#![feature(const_fn)]
+#![feature(const_fn, drop_types_in_const)]
 ```
 
 ## License

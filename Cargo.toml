@@ -1,6 +1,6 @@
 [package]
 name = "state"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Sergio Benitez <sb@sergio.bz>"]
 description = """
 A library for safe and effortless global and thread-local state management.
@@ -24,3 +24,6 @@ lto = true
 [profile.bench]
 opt-level = 3
 lto = true
+
+[package.metadata.docs.rs]
+all-features = true
