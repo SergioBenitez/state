@@ -323,7 +323,8 @@ impl Drop for Container {
                 drop(&mut boxed_any);
             }
 
-            drop(map as &mut HashMap<_, _, _>);
+            let mut boxed_map: Box<HashMap<_, _, _>> = Box::from_raw(map);
+            drop(&mut boxed_map);
         }
     }
 }
