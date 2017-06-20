@@ -1,6 +1,6 @@
 [package]
 name = "state"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Sergio Benitez <sb@sergio.bz>"]
 description = """
 A library for safe and effortless global and thread-local state management.
