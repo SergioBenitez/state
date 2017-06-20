@@ -2,8 +2,37 @@
 
 extern crate state;
 
+use std::sync::{Arc, RwLock};
+
+// Tiny structures to test that dropping works as expected.
+struct DroppingStruct(Arc<RwLock<bool>>);
+struct DroppingStructWrap(DroppingStruct);
+
+impl Drop for DroppingStruct {
+    fn drop(&mut self) {
+        *self.0.write().unwrap() = true;
+    }
+}
+
+// Ensure our DroppingStruct works as intended.
+#[test]
+fn test_dropping_struct() {
+    let drop_flag = Arc::new(RwLock::new(false));
+    let dropping_struct = DroppingStruct(drop_flag.clone());
+    drop(dropping_struct);
+    assert_eq!(*drop_flag.read().unwrap(), true);
+
+    let drop_flag = Arc::new(RwLock::new(false));
+    let dropping_struct = DroppingStruct(drop_flag.clone());
+    let wrapper = DroppingStructWrap(dropping_struct);
+    drop(wrapper);
+    assert_eq!(*drop_flag.read().unwrap(), true);
+}
+
 mod container_tests {
+    use super::{DroppingStruct, DroppingStructWrap};
     use super::state::Container;
+    use std::sync::{Arc, RwLock};
     use std::thread;
 
     // We use one `CONTAINER` to get an implicit test since each `test` runs in
@@ -58,28 +87,9 @@ mod container_tests {
         assert_eq!(*CONTAINER.get::<i64>(), 10);
     }
 
-    use std::sync::{Arc, RwLock};
-
-    struct DroppingStruct(Arc<RwLock<bool>>);
-
-    impl Drop for DroppingStruct {
-        fn drop(&mut self) {
-            *self.0.write().unwrap() = true;
-        }
-    }
-
-    // Ensure out DroppingStruct works as intended.
-    #[test]
-    fn test_dropping_struct() {
-        let drop_flag = Arc::new(RwLock::new(false));
-        let dropping_struct = DroppingStruct(drop_flag.clone());
-        drop(dropping_struct);
-        assert_eq!(*drop_flag.read().unwrap(), true);
-    }
-
     // Ensure setting when already set doesn't cause a drop.
     #[test]
-    fn test_drop_on_replace() {
+    fn test_no_drop_on_set() {
         let drop_flag = Arc::new(RwLock::new(false));
         let dropping_struct = DroppingStruct(drop_flag.clone());
 
@@ -89,6 +99,29 @@ mod container_tests {
         CONTAINER.set::<DroppingStruct>(dropping_struct);
         assert!(!CONTAINER.set::<DroppingStruct>(_dropping_struct_ignore));
         assert_eq!(*drop_flag.read().unwrap(), false);
+    }
+
+    // Ensure dropping a container drops its contents.
+    #[test]
+    fn drop_inners_on_drop() {
+        let drop_flag_a = Arc::new(RwLock::new(false));
+        let dropping_struct_a = DroppingStruct(drop_flag_a.clone());
+
+        let drop_flag_b = Arc::new(RwLock::new(false));
+        let dropping_struct_b = DroppingStructWrap(DroppingStruct(drop_flag_b.clone()));
+
+        {
+            let container = Container::new();
+            container.set(dropping_struct_a);
+            assert_eq!(*drop_flag_a.read().unwrap(), false);
+
+            container.set(dropping_struct_b);
+            assert_eq!(*drop_flag_a.read().unwrap(), false);
+            assert_eq!(*drop_flag_b.read().unwrap(), false);
+        }
+
+        assert_eq!(*drop_flag_a.read().unwrap(), true);
+        assert_eq!(*drop_flag_b.read().unwrap(), true);
     }
 }
 
@@ -160,7 +193,9 @@ mod container_tests_tls {
 }
 
 mod storage_tests {
+    use super::DroppingStruct;
     use super::state::Storage;
+    use std::sync::{Arc, RwLock};
     use std::thread;
 
     #[test]
@@ -205,8 +240,22 @@ mod storage_tests {
         assert!(STORAGE.set([1, 2, 3, 4]));
         assert_eq!(*STORAGE.get(), [1, 2, 3, 4]);
     }
-}
 
+    // Ensure dropping a `Storage<T>` drops `T`.
+    #[test]
+    fn drop_inners_on_drop() {
+        let drop_flag = Arc::new(RwLock::new(false));
+        let dropping_struct = DroppingStruct(drop_flag.clone());
+
+        {
+            let storage = Storage::new();
+            assert!(storage.set(dropping_struct));
+            assert_eq!(*drop_flag.read().unwrap(), false);
+        }
+
+        assert_eq!(*drop_flag.read().unwrap(), true);
+    }
+}
 
 #[cfg(feature = "tls")]
 mod storage_tests_tls {

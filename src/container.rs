@@ -319,10 +319,11 @@ impl Drop for Container {
         unsafe {
             let map = &mut **self.map.get();
             for value in map.values_mut() {
-                drop(&mut *value);
+                let mut boxed_any: Box<Any> = Box::from_raw(*value);
+                drop(&mut boxed_any);
             }
 
-            drop(map);
+            drop(map as &mut HashMap<_, _, _>);
         }
     }
 }

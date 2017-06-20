@@ -213,7 +213,8 @@ impl<T: Send + Sync + 'static> Drop for Storage<T> {
     fn drop(&mut self) {
         if self.init.has_completed() {
             unsafe {
-                drop(&mut *self.item.get())
+                let mut item: Box<T> = Box::from_raw(*self.item.get());
+                drop(&mut item);
             }
         }
     }
