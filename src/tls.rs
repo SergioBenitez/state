@@ -73,7 +73,7 @@ unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 /// The following example uses `LocalStorage` to store a per-thread count:
 ///
 /// ```rust
-/// # #![feature(const_fn)]
+/// # #![feature(const_fn, drop_types_in_const)]
 /// # extern crate state;
 /// # use std::cell::Cell;
 /// # use std::thread;
@@ -114,7 +114,7 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// use state::LocalStorage;
     ///
     /// static MY_GLOBAL: LocalStorage<String> = LocalStorage::new();
@@ -134,7 +134,7 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use state::LocalStorage;
     /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
     ///
@@ -157,7 +157,7 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use state::LocalStorage;
     /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
     ///
@@ -185,7 +185,7 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use state::LocalStorage;
     /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
     ///

@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 
 use init::Init;
 use ident_hash::IdentHash;
@@ -27,7 +27,7 @@ use tls::LocalValue;
 /// Set and later retrieve a value of type T:
 ///
 /// ```rust
-/// # #![feature(const_fn)]
+/// # #![feature(const_fn, drop_types_in_const)]
 /// # struct T;
 /// # impl T { fn new() -> T { T } }
 /// static CONTAINER: state::Container = state::Container::new();
@@ -62,7 +62,7 @@ use tls::LocalValue;
 /// Set and later retrieve a value of type T:
 ///
 /// ```rust
-/// # #![feature(const_fn)]
+/// # #![feature(const_fn, drop_types_in_const)]
 /// # struct T;
 /// # impl T { fn new() -> T { T } }
 /// # #[cfg(not(feature = "tls"))] fn test() { }
@@ -76,7 +76,7 @@ use tls::LocalValue;
 /// ```
 pub struct Container {
     init: Init,
-    map: UnsafeCell<*mut HashMap<TypeId, *mut u8, BuildHasherDefault<IdentHash>>>,
+    map: UnsafeCell<*mut HashMap<TypeId, *mut Any, BuildHasherDefault<IdentHash>>>,
     mutex: AtomicUsize,
 }
 
@@ -88,7 +88,7 @@ impl Container {
     /// Create a globally available state container:
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// static CONTAINER: state::Container = state::Container::new();
     /// ```
     pub const fn new() -> Container {
@@ -135,7 +135,7 @@ impl Container {
     /// second fails.
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use std::sync::atomic::AtomicUsize;
     /// static CONTAINER: state::Container = state::Container::new();
     ///
@@ -151,8 +151,8 @@ impl Container {
             self.lock();
             let already_set = (**self.map.get()).contains_key(&type_id);
             if !already_set {
-                let state_entry = Box::into_raw(Box::new(state));
-                (**self.map.get()).insert(type_id, state_entry as *mut u8);
+                let state_entry = Box::into_raw(Box::new(state) as Box<Any>);
+                (**self.map.get()).insert(type_id, state_entry);
             }
 
             self.unlock();
@@ -168,7 +168,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// struct MyState(AtomicUsize);
     ///
@@ -191,7 +191,7 @@ impl Container {
             self.lock();
             let item = (**self.map.get()).get(&type_id);
             self.unlock();
-            item.map(|ptr| &*(*ptr as *mut T))
+            item.map(|ptr| &*(*ptr as *const Any as *const T))
         }
     }
 
@@ -206,7 +206,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// struct MyState(AtomicUsize);
     ///
@@ -233,7 +233,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///
@@ -258,7 +258,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///
@@ -288,7 +288,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///
@@ -309,3 +309,20 @@ impl Container {
 
 unsafe impl Sync for Container {  }
 unsafe impl Send for Container {  }
+
+impl Drop for Container {
+    fn drop(&mut self) {
+        if !self.init.has_completed() {
+            return
+        }
+
+        unsafe {
+            let map = &mut **self.map.get();
+            for value in map.values_mut() {
+                drop(&mut *value);
+            }
+
+            drop(map);
+        }
+    }
+}

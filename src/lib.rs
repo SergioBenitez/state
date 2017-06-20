@@ -1,4 +1,4 @@
-#![feature(const_fn)]
+#![feature(const_fn, drop_types_in_const)]
 
 //! # state - safe and effortless state management
 //!
@@ -29,11 +29,11 @@
 //! ```
 //!
 //! This crate requires Rust nightly due to the instability of the `const_fn`
-//! feature. Ensure the feature is enabled by adding the following to your
-//! top-level crate attributes:
+//! and `drop_types_in_const` features. Ensure the features are enabled by
+//! adding the following to your top-level crate attributes:
 //!
 //! ```rust
-//! #![feature(const_fn)]
+//! #![feature(const_fn, drop_types_in_const)]
 //! ```
 //!
 //! ## Use Cases
@@ -74,7 +74,7 @@
 //! `set` and `get`, as follows:
 //!
 //! ```rust
-//! # #![feature(const_fn)]
+//! # #![feature(const_fn, drop_types_in_const)]
 //! # extern crate state;
 //! # #[cfg(feature = "tls")]
 //! # fn main() {
@@ -118,7 +118,7 @@
 //! the `Configuration` type with a `RwLock`:
 //!
 //! ```rust
-//! # #![feature(const_fn)]
+//! # #![feature(const_fn, drop_types_in_const)]
 //! # struct Configuration { name: String, number: isize, verbose: bool }
 //! # use state::Storage;
 //! # use std::sync::RwLock;
@@ -150,7 +150,7 @@
 //! is implemented in the folloiwng:
 //!
 //! ```rust
-//! # #![feature(const_fn)]
+//! # #![feature(const_fn, drop_types_in_const)]
 //! # extern crate state;
 //! # use std::cell::Cell;
 //! # use std::thread;

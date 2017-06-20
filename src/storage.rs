@@ -22,7 +22,7 @@ use init::Init;
 /// `HashMap` which can be modified at will:
 ///
 /// ```rust
-/// # #![feature(const_fn)]
+/// # #![feature(const_fn, drop_types_in_const)]
 /// use std::collections::HashMap;
 /// use std::sync::Mutex;
 /// use std::thread;
@@ -61,7 +61,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// use state::Storage;
     ///
     /// static MY_GLOBAL: Storage<String> = Storage::new();
@@ -83,7 +83,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -111,7 +111,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -143,7 +143,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -162,7 +162,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
+    /// # #![feature(const_fn, drop_types_in_const)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -205,6 +205,16 @@ impl<T: Clone + Default + Send + Sync + 'static> Clone for Storage<T> {
         match self.try_get() {
             Some(val) => Storage::from(val.clone()),
             None => Storage::from(T::default())
+        }
+    }
+}
+
+impl<T: Send + Sync + 'static> Drop for Storage<T> {
+    fn drop(&mut self) {
+        if self.init.has_completed() {
+            unsafe {
+                drop(&mut *self.item.get())
+            }
         }
     }
 }
