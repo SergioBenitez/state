@@ -1,5 +1,5 @@
 #![feature(test)]
-#![feature(const_fn, drop_types_in_const)]
+#![feature(const_fn)]
 
 extern crate test;
 extern crate state;

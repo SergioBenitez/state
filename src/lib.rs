@@ -1,4 +1,7 @@
-#![feature(const_fn, drop_types_in_const)]
+#![feature(const_fn)]
+#![feature(const_unsafe_cell_new)]
+#![feature(const_atomic_usize_new)]
+#![feature(const_atomic_bool_new)]
 
 //! # state - safe and effortless state management
 //!
