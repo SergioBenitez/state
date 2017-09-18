@@ -27,7 +27,7 @@ use tls::LocalValue;
 /// Set and later retrieve a value of type T:
 ///
 /// ```rust
-/// # #![feature(const_fn, drop_types_in_const)]
+/// # #![feature(const_fn)]
 /// # struct T;
 /// # impl T { fn new() -> T { T } }
 /// static CONTAINER: state::Container = state::Container::new();
@@ -62,7 +62,7 @@ use tls::LocalValue;
 /// Set and later retrieve a value of type T:
 ///
 /// ```rust
-/// # #![feature(const_fn, drop_types_in_const)]
+/// # #![feature(const_fn)]
 /// # struct T;
 /// # impl T { fn new() -> T { T } }
 /// # #[cfg(not(feature = "tls"))] fn test() { }
@@ -88,7 +88,7 @@ impl Container {
     /// Create a globally available state container:
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// static CONTAINER: state::Container = state::Container::new();
     /// ```
     pub const fn new() -> Container {
@@ -135,7 +135,7 @@ impl Container {
     /// second fails.
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use std::sync::atomic::AtomicUsize;
     /// static CONTAINER: state::Container = state::Container::new();
     ///
@@ -168,7 +168,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// struct MyState(AtomicUsize);
     ///
@@ -206,7 +206,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// struct MyState(AtomicUsize);
     ///
@@ -233,7 +233,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///
@@ -258,7 +258,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///
@@ -288,7 +288,7 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///

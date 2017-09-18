@@ -30,12 +30,12 @@ via the `tls` feature:
 state = { version = "0.3", features = ["tls"] }
 ```
 
-This crate requires Rust nightly due to the instability of the `const_fn` and
-`drop_types_in_const` features. Ensure the features are enabled by adding the
-following to your top-level crate attributes:
+This crate requires Rust nightly due to the instability of the `const_fn`
+feature. Ensure that it is enabled by adding the following to your top-level
+crate attributes:
 
 ```rust
-#![feature(const_fn, drop_types_in_const)]
+#![feature(const_fn)]
 ```
 
 ## License

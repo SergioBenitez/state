@@ -22,7 +22,7 @@ use init::Init;
 /// `HashMap` which can be modified at will:
 ///
 /// ```rust
-/// # #![feature(const_fn, drop_types_in_const)]
+/// # #![feature(const_fn)]
 /// use std::collections::HashMap;
 /// use std::sync::Mutex;
 /// use std::thread;
@@ -61,7 +61,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// use state::Storage;
     ///
     /// static MY_GLOBAL: Storage<String> = Storage::new();
@@ -83,7 +83,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -111,7 +111,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -143,7 +143,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -162,7 +162,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn, drop_types_in_const)]
+    /// # #![feature(const_fn)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
