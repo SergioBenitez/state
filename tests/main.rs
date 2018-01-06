@@ -255,6 +255,19 @@ mod storage_tests {
 
         assert_eq!(*drop_flag.read().unwrap(), true);
     }
+
+    #[test]
+    fn clone() {
+        let storage: Storage<u32> = Storage::new();
+        assert!(storage.try_get().is_none());
+
+        let storage_clone = storage.clone();
+        assert!(storage_clone.try_get().is_none());
+
+        assert!(storage.set(10));
+        let storage_clone = storage.clone();
+        assert_eq!(*storage_clone.get(), 10);
+    }
 }
 
 #[cfg(feature = "tls")]

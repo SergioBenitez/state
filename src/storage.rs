@@ -200,11 +200,11 @@ impl<T: Send + Sync + 'static> From<T> for Storage<T> {
     }
 }
 
-impl<T: Clone + Default + Send + Sync + 'static> Clone for Storage<T> {
+impl<T: Clone + Send + Sync + 'static> Clone for Storage<T> {
     fn clone(&self) -> Storage<T> {
         match self.try_get() {
             Some(val) => Storage::from(val.clone()),
-            None => Storage::from(T::default())
+            None => Storage::new()
         }
     }
 }
