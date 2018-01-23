@@ -29,6 +29,7 @@ fn test_dropping_struct() {
     assert_eq!(*drop_flag.read().unwrap(), true);
 }
 
+#[cfg(feature = "const_fn")]
 mod container_tests {
     use super::{DroppingStruct, DroppingStructWrap};
     use super::state::Container;
@@ -125,7 +126,7 @@ mod container_tests {
     }
 }
 
-#[cfg(feature = "tls")]
+#[cfg(all(feature = "tls", feature = "const_fn"))]
 mod container_tests_tls {
     use super::state::Container;
     use std::cell::Cell;
@@ -192,6 +193,7 @@ mod container_tests_tls {
     }
 }
 
+#[cfg(feature = "const_fn")]
 mod storage_tests {
     use super::DroppingStruct;
     use super::state::Storage;

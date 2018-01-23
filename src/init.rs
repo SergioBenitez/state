@@ -6,10 +6,12 @@ pub struct Init {
 }
 
 impl Init {
-    pub const fn new() -> Init {
-        Init {
-            init_started: AtomicBool::new(false),
-            init_done: AtomicBool::new(false)
+    const_if_enabled! {
+        pub fn new() -> Init {
+            Init {
+                init_started: AtomicBool::new(false),
+                init_done: AtomicBool::new(false)
+            }
         }
     }
 

@@ -11,7 +11,15 @@ GLOBAL.set(42);
 assert_eq!(*GLOBAL.get(), 42);
 ```
 
-See the [documentation](https://sergio.bz/rustdocs/state) for more.
+This library can be used to easily implement:
+
+  * Global Singletons
+  * Global or Local Cached Values
+  * Thread-Local Thunks
+  * Dynamic Thread-Local Data
+  * Typed Containers
+
+See the [documentation](https://docs.rs/state) for more.
 
 ## Usage
 
@@ -30,13 +38,25 @@ via the `tls` feature:
 state = { version = "0.3", features = ["tls"] }
 ```
 
-This crate requires Rust nightly due to the instability of the `const_fn`
-feature. Ensure that it is enabled by adding the following to your top-level
-crate attributes:
+All constructors may be made `const` by enabling the `const_fn` feature:
+
+```toml
+[dependencies]
+state = { version = "0.3", features = ["const_fn"] }
+```
+
+This will require Rust nightly due to the instability of the `const_fn` feature.
+Ensure that it is enabled by adding the following to your top-level crate
+attributes:
 
 ```rust
 #![feature(const_fn)]
 ```
+
+## Testing
+
+This library is extensively tested. Tests can be found in `tests/main.rs`. You
+can run the tests on Rust nightly with `cargo test --all-features`.
 
 ## License
 

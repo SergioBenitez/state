@@ -56,21 +56,23 @@ pub struct Storage<T: Send + Sync + 'static> {
 }
 
 impl<T: Send + Sync + 'static> Storage<T> {
-    /// Create a new, uninitialized storage location.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # #![feature(const_fn)]
-    /// use state::Storage;
-    ///
-    /// static MY_GLOBAL: Storage<String> = Storage::new();
-    /// ```
-    pub const fn new() -> Storage<T> {
-        Storage {
-            _phantom: PhantomData,
-            item: UnsafeCell::new(0 as *mut T),
-            init: Init::new()
+    const_if_enabled! {
+        /// Create a new, uninitialized storage location.
+        ///
+        /// # Example
+        ///
+        /// ```rust
+        /// # #![feature(const_fn)]
+        /// use state::Storage;
+        ///
+        /// static MY_GLOBAL: Storage<String> = Storage::new();
+        /// ```
+        pub fn new() -> Storage<T> {
+            Storage {
+                _phantom: PhantomData,
+                item: UnsafeCell::new(0 as *mut T),
+                init: Init::new()
+            }
         }
     }
 

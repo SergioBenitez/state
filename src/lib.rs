@@ -1,7 +1,4 @@
-#![feature(const_fn)]
-#![feature(const_unsafe_cell_new)]
-#![feature(const_atomic_usize_new)]
-#![feature(const_atomic_bool_new)]
+#![cfg_attr(feature = "const_fn", feature(const_fn))]
 
 //! # state - safe and effortless state management
 //!
@@ -31,9 +28,16 @@
 //! state = { version = "0.2", features = ["tls"] }
 //! ```
 //!
-//! This crate requires Rust nightly due to the instability of the `const_fn`
-//! feature. Ensure that it is enabled by adding the following to your top-level
-//! crate attributes:
+//! All constructors may be made `const` by enabling the `const_fn` feature:
+//!
+//! ```toml
+//! [dependencies]
+//! state = { version = "0.3", features = ["const_fn"] }
+//! ```
+//!
+//! This will require Rust nightly due to the instability of the `const_fn` feature.
+//! Ensure that it is enabled by adding the following to your top-level crate
+//! attributes:
 //!
 //! ```rust
 //! #![feature(const_fn)]
@@ -214,6 +218,26 @@
 //! You should avoid using `state` as much as possible. Instead, thread state
 //! manually throughout your program when feasible.
 //!
+
+// Tiny macro to easily create const and not const function variants that depend
+// on the `const_fn` feature.
+macro_rules! const_if_enabled {
+    ($(#[$($s:tt)*])* pub fn $($rest:tt)*) => {
+        const_if_enabled!([$(#[$($s)*])* pub] $($rest)*);
+    };
+
+    ($(#[$($s:tt)*])* fn $($rest:tt)*) => {
+        const_if_enabled!([$(#[$($s)*])*] $($rest)*);
+    };
+
+    ([$($marker:tt)+] $($rest:tt)*) => {
+        #[cfg(not(feature = "const_fn"))]
+        $($marker)+ fn $($rest)*
+
+        #[cfg(feature = "const_fn")]
+        $($marker)+ const fn $($rest)*
+    };
+}
 
 mod ident_hash;
 mod container;

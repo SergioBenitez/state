@@ -109,18 +109,20 @@ pub struct LocalStorage<T: Send + 'static> {
 }
 
 impl<T: Send + 'static> LocalStorage<T> {
-    /// Create a new, uninitialized storage location.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # #![feature(const_fn)]
-    /// use state::LocalStorage;
-    ///
-    /// static MY_GLOBAL: LocalStorage<String> = LocalStorage::new();
-    /// ```
-    pub const fn new() -> LocalStorage<T> {
-        LocalStorage { storage: Storage::new() }
+    const_if_enabled! {
+        /// Create a new, uninitialized storage location.
+        ///
+        /// # Example
+        ///
+        /// ```rust
+        /// # #![feature(const_fn)]
+        /// use state::LocalStorage;
+        ///
+        /// static MY_GLOBAL: LocalStorage<String> = LocalStorage::new();
+        /// ```
+        pub fn new() -> LocalStorage<T> {
+            LocalStorage { storage: Storage::new() }
+        }
     }
 
     /// Sets the initialization function for this local storage unit to

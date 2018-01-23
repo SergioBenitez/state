@@ -81,21 +81,23 @@ pub struct Container {
 }
 
 impl Container {
-    /// Creates a new container with no stored values.
-    ///
-    /// ## Example
-    ///
-    /// Create a globally available state container:
-    ///
-    /// ```rust
-    /// # #![feature(const_fn)]
-    /// static CONTAINER: state::Container = state::Container::new();
-    /// ```
-    pub const fn new() -> Container {
-        Container {
-            init: Init::new(),
-            map: UnsafeCell::new(0 as *mut _),
-            mutex: AtomicUsize::new(0)
+    const_if_enabled! {
+        /// Creates a new container with no stored values.
+        ///
+        /// ## Example
+        ///
+        /// Create a globally available state container:
+        ///
+        /// ```rust
+        /// # #![feature(const_fn)]
+        /// static CONTAINER: state::Container = state::Container::new();
+        /// ```
+        pub fn new() -> Container {
+            Container {
+                init: Init::new(),
+                map: UnsafeCell::new(0 as *mut _),
+                mutex: AtomicUsize::new(0)
+            }
         }
     }
 
