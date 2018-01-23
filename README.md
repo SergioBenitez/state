@@ -27,7 +27,7 @@ Include `state` in your `Cargo.toml` `[dependencies]`:
 
 ```toml
 [dependencies]
-state = "0.3"
+state = "0.4"
 ```
 
 Thread-local state management is not enabled by default. You can enable it
@@ -35,14 +35,14 @@ via the `tls` feature:
 
 ```toml
 [dependencies]
-state = { version = "0.3", features = ["tls"] }
+state = { version = "0.4", features = ["tls"] }
 ```
 
 All constructors may be made `const` by enabling the `const_fn` feature:
 
 ```toml
 [dependencies]
-state = { version = "0.3", features = ["const_fn"] }
+state = { version = "0.4", features = ["const_fn"] }
 ```
 
 This will require Rust nightly due to the instability of the `const_fn` feature.

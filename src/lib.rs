@@ -32,7 +32,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! state = { version = "0.3", features = ["const_fn"] }
+//! state = { version = "0.4", features = ["const_fn"] }
 //! ```
 //!
 //! This will require Rust nightly due to the instability of the `const_fn` feature.
