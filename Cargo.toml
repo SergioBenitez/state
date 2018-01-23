@@ -16,7 +16,7 @@ tls = ["thread_local"]
 const_fn = []
 
 [dependencies]
-thread_local = { version = "0.3", optional = true }
+thread_local = { version = "<= 0.3.3", optional = true }
 
 [profile.release]
 opt-level = 3

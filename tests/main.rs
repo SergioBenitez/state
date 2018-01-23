@@ -167,8 +167,11 @@ mod container_tests_tls {
         let mut threads = vec![];
         for i in 1..50 {
             threads.push(thread::spawn(move || {
+                assert_eq!(CONTAINER.get_local::<Cell<u8>>().get(), 0);
                 CONTAINER.get_local::<Cell<u8>>().set(i);
-                CONTAINER.get_local::<Cell<u8>>().get()
+                let v = CONTAINER.get_local::<Cell<u8>>().get();
+                ::std::thread::sleep(::std::time::Duration::from_millis(500));
+                v
             }));
         }
 
