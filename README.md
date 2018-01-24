@@ -19,7 +19,7 @@ This library can be used to easily implement:
   * Dynamic Thread-Local Data
   * Typed Containers
 
-See the [documentation](https://docs.rs/state) for more.
+See the [documentation](https://sergio.bz/rustdocs/state) for more.
 
 ## Usage
 
