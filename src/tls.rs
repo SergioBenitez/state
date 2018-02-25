@@ -204,7 +204,7 @@ unsafe impl<T: Send + 'static> Send for LocalStorage<T> {  }
 
 unsafe impl<T: Send + 'static> Sync for LocalStorage<T> {  }
 
-impl<T: fmt::Debug + Send + Sync + 'static> fmt::Debug for LocalStorage<T> {
+impl<T: fmt::Debug + Send + 'static> fmt::Debug for LocalStorage<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self.try_get() {
             Some(object) => object.fmt(f),
