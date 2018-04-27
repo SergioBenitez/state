@@ -1,5 +1,5 @@
 use std::cell::UnsafeCell;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::any::{Any, TypeId};
@@ -35,6 +35,18 @@ use tls::LocalValue;
 /// CONTAINER.set(T::new());
 /// CONTAINER.get::<T>();
 /// ```
+///
+/// ## Freezing
+///
+/// By default, all `get`, `set`, `get_local`, and `set_local` calls result in
+/// synchronization overhead for safety. However, if calling `set` or
+/// `set_local` is no longer required, the overhead can be eliminated by
+/// _freezing_ the `Container`. A frozen container can only be read and never
+/// written to. Attempts to write to a frozen container will fail.
+///
+/// To freeze a `Container`, call [`freeze()`](Container::freeze()). A frozen
+/// container can never be thawed. To check if a container is frozen, call
+/// [`is_frozen()`](Container::is_frozen()).
 ///
 /// ## Thread-Local State
 ///
@@ -78,6 +90,7 @@ pub struct Container {
     init: Init,
     map: UnsafeCell<*mut HashMap<TypeId, *mut Any, BuildHasherDefault<IdentHash>>>,
     mutex: AtomicUsize,
+    frozen: AtomicBool
 }
 
 impl Container {
@@ -96,7 +109,8 @@ impl Container {
             Container {
                 init: Init::new(),
                 map: UnsafeCell::new(0 as *mut _),
-                mutex: AtomicUsize::new(0)
+                mutex: AtomicUsize::new(0),
+                frozen: AtomicBool::new(false),
             }
         }
     }
@@ -126,10 +140,60 @@ impl Container {
         assert!(self.mutex.compare_and_swap(1, 0, Ordering::SeqCst) == 1);
     }
 
-    /// Sets the global state for type `T` if it has not been set before.
+    /// Freezes the container. A frozen container disallows writes allowing for
+    /// synchronization-free reads.
     ///
-    /// If the state for `T` has previously been set, the state is unchanged and
-    /// `false` is returned. Otherwise `true` is returned.
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::Container;
+    ///
+    /// // A new container starts unfrozen and can be written to.
+    /// let mut container = Container::new();
+    /// assert_eq!(container.set(1usize), true);
+    ///
+    /// // While unfrozen, `get`s require synchronization.
+    /// assert_eq!(container.get::<usize>(), &1);
+    ///
+    /// // After freezing, calls to `set` or `set_local `will fail.
+    /// container.freeze();
+    /// assert_eq!(container.set(1u8), false);
+    /// assert_eq!(container.set("hello"), false);
+    ///
+    /// // Calls to `get` or `get_local` are synchronization-free when frozen.
+    /// assert_eq!(container.try_get::<u8>(), None);
+    /// assert_eq!(container.get::<usize>(), &1);
+    /// ```
+    #[inline(always)]
+    pub fn freeze(&mut self) {
+        self.frozen.store(true, Ordering::SeqCst);
+    }
+
+    /// Returns `true` if the container is frozen and `false` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::Container;
+    ///
+    /// // A new container starts unfrozen and is frozen using `freeze`.
+    /// let mut container = Container::new();
+    /// assert_eq!(container.is_frozen(), false);
+    ///
+    /// container.freeze();
+    /// assert_eq!(container.is_frozen(), true);
+    /// ```
+    #[inline(always)]
+    pub fn is_frozen(&self) -> bool {
+        self.frozen.load(Ordering::Relaxed)
+    }
+
+    /// Sets the global state for type `T` if it has not been set before and
+    /// `self` is not frozen.
+    ///
+    /// If the state for `T` has previously been set or `self` is frozen, the
+    /// state is unchanged and `false` is returned. Otherwise `true` is
+    /// returned.
     ///
     /// # Example
     ///
@@ -146,6 +210,10 @@ impl Container {
     /// ```
     #[inline]
     pub fn set<T: Send + Sync + 'static>(&self, state: T) -> bool {
+        if self.is_frozen() {
+            return false;
+        }
+
         self.ensure_map_initialized();
         let type_id = TypeId::of::<T>();
 
@@ -190,9 +258,19 @@ impl Container {
         let type_id = TypeId::of::<T>();
 
         unsafe {
-            self.lock();
-            let item = (**self.map.get()).get(&type_id);
-            self.unlock();
+            let unsync_get_item = || (**self.map.get()).get(&type_id);
+
+            // If we're frozen, there can't be any concurrent writers, so we're
+            // free to read this safely without taking a lock.
+            let item = if self.is_frozen() {
+                unsync_get_item()
+            } else {
+                self.lock();
+                let item = unsync_get_item();
+                self.unlock();
+                item
+            };
+
             item.map(|ptr| &*(*ptr as *const Any as *const T))
         }
     }
