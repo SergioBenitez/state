@@ -17,7 +17,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! state = "0.2"
+//! state = "0.4"
 //! ```
 //!
 //! Thread-local state management is not enabled by default. You can enable it
@@ -25,7 +25,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! state = { version = "0.2", features = ["tls"] }
+//! state = { version = "0.4", features = ["tls"] }
 //! ```
 //!
 //! All constructors may be made `const` by enabling the `const_fn` feature:

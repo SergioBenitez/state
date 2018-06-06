@@ -65,7 +65,7 @@ unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 ///
 /// ```toml
 /// [dependencies]
-/// state = { version = "0.2", features = ["tls"] }
+/// state = { version = "0.4", features = ["tls"] }
 /// ```
 ///
 /// # Example
