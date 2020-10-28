@@ -74,4 +74,3 @@ impl Init {
         self.try_to_need_init()
     }
 }
-

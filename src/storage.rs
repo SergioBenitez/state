@@ -50,7 +50,7 @@ use init::Init;
 /// }
 pub struct Storage<T> {
     _phantom: PhantomData<T>,
-    item: UnsafeCell<*mut T>,
+    item: UnsafeCell<Option<T>>,
     init: Init
 }
 
@@ -67,7 +67,7 @@ impl<T> Storage<T> {
     pub const fn new() -> Storage<T> {
         Storage {
             _phantom: PhantomData,
-            item: UnsafeCell::new(0 as *mut T),
+            item: UnsafeCell::new(None),
             init: Init::new()
         }
     }
@@ -91,10 +91,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// ```
     pub fn set(&self, value: T) -> bool {
         if self.init.needed() {
-            unsafe {
-                *self.item.get() = Box::into_raw(Box::new(value));
-            }
-
+            unsafe { *self.item.get() = Some(value); }
             self.init.mark_complete();
             return true;
         }
@@ -126,7 +123,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
         }
 
         unsafe {
-            Some(&**self.item.get())
+            (*self.item.get()).as_ref()
         }
     }
 
@@ -165,7 +162,7 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// assert_eq!(*MY_GLOBAL.get_or_set(|| "Hello, world!"), "Hello, world!");
     /// ```
     #[inline]
-    pub fn get_or_set<F: Fn() -> T>(&self, from: F) -> &T {
+    pub fn get_or_set<F: FnOnce() -> T>(&self, from: F) -> &T {
         if let Some(value) = self.try_get() {
             value
         } else {
@@ -201,17 +198,6 @@ impl<T: Clone + Send + Sync + 'static> Clone for Storage<T> {
         match self.try_get() {
             Some(val) => Storage::from(val.clone()),
             None => Storage::new()
-        }
-    }
-}
-
-impl<T> Drop for Storage<T> {
-    fn drop(&mut self) {
-        if self.init.has_completed() {
-            unsafe {
-                let mut item: Box<T> = Box::from_raw(*self.item.get());
-                drop(&mut item);
-            }
         }
     }
 }
