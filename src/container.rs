@@ -27,7 +27,6 @@ use tls::LocalValue;
 /// Set and later retrieve a value of type T:
 ///
 /// ```rust
-/// # #![feature(const_fn)]
 /// # struct T;
 /// # impl T { fn new() -> T { T } }
 /// static CONTAINER: state::Container = state::Container::new();
@@ -74,7 +73,6 @@ use tls::LocalValue;
 /// Set and later retrieve a value of type T:
 ///
 /// ```rust
-/// # #![feature(const_fn)]
 /// # struct T;
 /// # impl T { fn new() -> T { T } }
 /// # #[cfg(not(feature = "tls"))] fn test() { }
@@ -88,56 +86,74 @@ use tls::LocalValue;
 /// ```
 pub struct Container {
     init: Init,
-    map: UnsafeCell<*mut HashMap<TypeId, *mut Any, BuildHasherDefault<IdentHash>>>,
+    map: UnsafeCell<Option<TypeMap>>,
     mutex: AtomicUsize,
     frozen: AtomicBool
 }
 
-impl Container {
-    const_if_enabled! {
-        /// Creates a new container with no stored values.
-        ///
-        /// ## Example
-        ///
-        /// Create a globally available state container:
-        ///
-        /// ```rust
-        /// # #![feature(const_fn)]
-        /// static CONTAINER: state::Container = state::Container::new();
-        /// ```
-        pub fn new() -> Container {
-            Container {
-                init: Init::new(),
-                map: UnsafeCell::new(0 as *mut _),
-                mutex: AtomicUsize::new(0),
-                frozen: AtomicBool::new(false),
-            }
-        }
+type TypeMap = HashMap<TypeId, AnyObject, BuildHasherDefault<IdentHash>>;
+
+/// FIXME: This is a hack so we can create a *mut dyn Any with a `const`. It
+/// depends on trait objects being represented in this way.
+#[repr(C)]
+struct AnyObject {
+    data: *mut (),
+    vtable: *mut (),
+}
+
+impl AnyObject {
+    fn anonymize<T: 'static>(value: T) -> AnyObject {
+        let any: Box<dyn Any> = Box::new(value) as Box<dyn Any>;
+        let any: *mut dyn Any = Box::into_raw(any);
+        unsafe { std::mem::transmute(any) }
     }
 
-    // Initializes the `STATE` global variable. This _MUST_ be called before
-    // accessing the variable!
-    #[inline(always)]
-    fn ensure_map_initialized(&self) {
-        if self.init.needed() {
-            unsafe {
-                // TODO: Don't have an extra layer of indirection. HashMap needs
-                // to expose a `const fn` to accomplish that, unfortunately.
-                *self.map.get() = Box::into_raw(Box::new(HashMap::<_, _, _>::default()));
-            }
+    fn deanonymize<T: 'static>(&self) -> &T {
+        unsafe {
+            let any: *const *const dyn Any = std::mem::transmute(self);
+            &*(*any as *const dyn Any as *const T)
+        }
+    }
+}
 
-            self.init.mark_complete();
+impl Drop for AnyObject {
+    fn drop(&mut self) {
+        unsafe {
+            let any: *mut *mut dyn Any = std::mem::transmute(self);
+            let any: *mut dyn Any = *any;
+            let any: Box<dyn Any> = Box::from_raw(any);
+            drop(any)
+        }
+    }
+}
+
+impl Container {
+    /// Creates a new container with no stored values.
+    ///
+    /// ## Example
+    ///
+    /// Create a globally available state container:
+    ///
+    /// ```rust
+    /// static CONTAINER: state::Container = state::Container::new();
+    /// ```
+    pub const fn new() -> Container {
+        Container {
+            init: Init::new(),
+            map: UnsafeCell::new(None),
+            mutex: AtomicUsize::new(0),
+            frozen: AtomicBool::new(false),
         }
     }
 
     #[inline(always)]
     fn lock(&self) {
-        while self.mutex.compare_and_swap(0, 1, Ordering::SeqCst) != 0 {}
+        while self.mutex.compare_and_swap(0, 1, Ordering::AcqRel) != 0 {}
     }
 
     #[inline(always)]
     fn unlock(&self) {
-        assert!(self.mutex.compare_and_swap(1, 0, Ordering::SeqCst) == 1);
+        assert!(self.mutex.compare_and_swap(1, 0, Ordering::AcqRel) == 1);
     }
 
     /// Freezes the container. A frozen container disallows writes allowing for
@@ -188,6 +204,28 @@ impl Container {
         self.frozen.load(Ordering::Relaxed)
     }
 
+    // Initializes the `map` if needed.
+    unsafe fn init_map_if_needed(&self) {
+        if self.init.needed() {
+            *self.map.get() = Some(HashMap::<_, _, _>::default());
+            self.init.mark_complete();
+        }
+    }
+
+    // Initializes the `map` if needed and returns it.
+    #[inline(always)]
+    unsafe fn map_mut(&self) -> &mut TypeMap {
+        self.init_map_if_needed();
+        (*self.map.get()).as_mut().unwrap()
+    }
+
+    // Initializes the `map` if needed and returns it.
+    #[inline(always)]
+    unsafe fn map_ref(&self) -> &TypeMap {
+        self.init_map_if_needed();
+        (*self.map.get()).as_ref().unwrap()
+    }
+
     /// Sets the global state for type `T` if it has not been set before and
     /// `self` is not frozen.
     ///
@@ -201,7 +239,6 @@ impl Container {
     /// second fails.
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use std::sync::atomic::AtomicUsize;
     /// static CONTAINER: state::Container = state::Container::new();
     ///
@@ -214,15 +251,13 @@ impl Container {
             return false;
         }
 
-        self.ensure_map_initialized();
-        let type_id = TypeId::of::<T>();
-
         unsafe {
             self.lock();
-            let already_set = (**self.map.get()).contains_key(&type_id);
+            let map = self.map_mut();
+            let type_id = TypeId::of::<T>();
+            let already_set = map.contains_key(&type_id);
             if !already_set {
-                let state_entry = Box::into_raw(Box::new(state) as Box<Any>);
-                (**self.map.get()).insert(type_id, state_entry);
+                map.insert(type_id, AnyObject::anonymize(state));
             }
 
             self.unlock();
@@ -238,7 +273,6 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// struct MyState(AtomicUsize);
     ///
@@ -254,24 +288,21 @@ impl Container {
     /// ```
     #[inline]
     pub fn try_get<T: Send + Sync + 'static>(&self) -> Option<&T> {
-        self.ensure_map_initialized();
-        let type_id = TypeId::of::<T>();
-
         unsafe {
-            let unsync_get_item = || (**self.map.get()).get(&type_id);
-
             // If we're frozen, there can't be any concurrent writers, so we're
             // free to read this safely without taking a lock.
+            let map = self.map_ref();
+            let type_id = TypeId::of::<T>();
             let item = if self.is_frozen() {
-                unsync_get_item()
+                map.get(&type_id)
             } else {
                 self.lock();
-                let item = unsync_get_item();
+                let item = map.get(&type_id);
                 self.unlock();
                 item
             };
 
-            item.map(|ptr| &*(*ptr as *const Any as *const T))
+            item.map(|ptr| ptr.deanonymize())
         }
     }
 
@@ -286,7 +317,6 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// struct MyState(AtomicUsize);
     ///
@@ -313,7 +343,6 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///
@@ -338,7 +367,6 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///
@@ -368,7 +396,6 @@ impl Container {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use std::cell::Cell;
     /// struct MyState(Cell<usize>);
     ///
@@ -389,22 +416,3 @@ impl Container {
 
 unsafe impl Sync for Container {  }
 unsafe impl Send for Container {  }
-
-impl Drop for Container {
-    fn drop(&mut self) {
-        if !self.init.has_completed() {
-            return
-        }
-
-        unsafe {
-            let map = &mut **self.map.get();
-            for value in map.values_mut() {
-                let mut boxed_any: Box<Any> = Box::from_raw(*value);
-                drop(&mut boxed_any);
-            }
-
-            let mut boxed_map: Box<HashMap<_, _, _>> = Box::from_raw(map);
-            drop(&mut boxed_map);
-        }
-    }
-}

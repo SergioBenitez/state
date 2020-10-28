@@ -1,5 +1,4 @@
 #![feature(test)]
-#![feature(const_fn)]
 
 extern crate test;
 extern crate state;

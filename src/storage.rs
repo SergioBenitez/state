@@ -22,7 +22,6 @@ use init::Init;
 /// `HashMap` which can be modified at will:
 ///
 /// ```rust
-/// # #![feature(const_fn)]
 /// use std::collections::HashMap;
 /// use std::sync::Mutex;
 /// use std::thread;
@@ -49,33 +48,32 @@ use init::Init;
 ///     let map = GLOBAL_MAP.get().lock().unwrap();
 ///     assert_eq!(map.get("another_key").unwrap(), "another_value");
 /// }
-pub struct Storage<T: Send + Sync + 'static> {
+pub struct Storage<T> {
     _phantom: PhantomData<T>,
     item: UnsafeCell<*mut T>,
     init: Init
 }
 
-impl<T: Send + Sync + 'static> Storage<T> {
-    const_if_enabled! {
-        /// Create a new, uninitialized storage location.
-        ///
-        /// # Example
-        ///
-        /// ```rust
-        /// # #![feature(const_fn)]
-        /// use state::Storage;
-        ///
-        /// static MY_GLOBAL: Storage<String> = Storage::new();
-        /// ```
-        pub fn new() -> Storage<T> {
-            Storage {
-                _phantom: PhantomData,
-                item: UnsafeCell::new(0 as *mut T),
-                init: Init::new()
-            }
+impl<T> Storage<T> {
+    /// Create a new, uninitialized storage location.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::Storage;
+    ///
+    /// static MY_GLOBAL: Storage<String> = Storage::new();
+    /// ```
+    pub const fn new() -> Storage<T> {
+        Storage {
+            _phantom: PhantomData,
+            item: UnsafeCell::new(0 as *mut T),
+            init: Init::new()
         }
     }
+}
 
+impl<T: Send + Sync + 'static> Storage<T> {
     /// Sets the value for this storage unit to `value` if it has not already
     /// been set before.
     ///
@@ -85,7 +83,6 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -113,7 +110,6 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -145,7 +141,6 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -164,7 +159,6 @@ impl<T: Send + Sync + 'static> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use state::Storage;
     /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
     ///
@@ -211,7 +205,7 @@ impl<T: Clone + Send + Sync + 'static> Clone for Storage<T> {
     }
 }
 
-impl<T: Send + Sync + 'static> Drop for Storage<T> {
+impl<T> Drop for Storage<T> {
     fn drop(&mut self) {
         if self.init.has_completed() {
             unsafe {

@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "const_fn", feature(const_fn))]
+#![doc(html_root_url = "https://docs.rs/state/0.4.1")]
 
 //! # state - safe and effortless state management
 //!
@@ -26,21 +26,6 @@
 //! ```toml
 //! [dependencies]
 //! state = { version = "0.4", features = ["tls"] }
-//! ```
-//!
-//! All constructors may be made `const` by enabling the `const_fn` feature:
-//!
-//! ```toml
-//! [dependencies]
-//! state = { version = "0.4", features = ["const_fn"] }
-//! ```
-//!
-//! This will require Rust nightly due to the instability of the `const_fn` feature.
-//! Ensure that it is enabled by adding the following to your top-level crate
-//! attributes:
-//!
-//! ```rust
-//! #![feature(const_fn)]
 //! ```
 //!
 //! ## Use Cases
@@ -81,7 +66,6 @@
 //! `set` and `get`, as follows:
 //!
 //! ```rust
-//! # #![feature(const_fn)]
 //! # extern crate state;
 //! # #[cfg(feature = "tls")]
 //! # fn main() {
@@ -125,7 +109,6 @@
 //! the `Configuration` type with a `RwLock`:
 //!
 //! ```rust
-//! # #![feature(const_fn)]
 //! # struct Configuration { name: String, number: isize, verbose: bool }
 //! # use state::Storage;
 //! # use std::sync::RwLock;
@@ -157,7 +140,6 @@
 //! is implemented in the folloiwng:
 //!
 //! ```rust
-//! # #![feature(const_fn)]
 //! # extern crate state;
 //! # use std::cell::Cell;
 //! # use std::thread;
@@ -183,6 +165,8 @@
 //!     let mut threads = vec![];
 //!     for i in 0..10 {
 //!         threads.push(thread::spawn(|| {
+//!             // Thread IDs may be reusued, so we reset the state.
+//!             COUNT.get().set(0);
 //!             function_to_measure();
 //!             COUNT.get().get()
 //!         }));
@@ -219,30 +203,15 @@
 //! manually throughout your program when feasible.
 //!
 
-// Tiny macro to easily create const and not const function variants that depend
-// on the `const_fn` feature.
-macro_rules! const_if_enabled {
-    ($(#[$($s:tt)*])* pub fn $($rest:tt)*) => {
-        const_if_enabled!([$(#[$($s)*])* pub] $($rest)*);
-    };
-
-    ($(#[$($s:tt)*])* fn $($rest:tt)*) => {
-        const_if_enabled!([$(#[$($s)*])*] $($rest)*);
-    };
-
-    ([$($marker:tt)+] $($rest:tt)*) => {
-        #[cfg(not(feature = "const_fn"))]
-        $($marker)+ fn $($rest)*
-
-        #[cfg(feature = "const_fn")]
-        $($marker)+ const fn $($rest)*
-    };
-}
+#[macro_use]
+#[cfg(feature = "tls")]
+extern crate lazy_static;
 
 mod ident_hash;
 mod container;
 mod storage;
 mod init;
+#[cfg(feature = "tls")] mod thread_local;
 #[cfg(feature = "tls")] mod tls;
 
 pub use container::Container;

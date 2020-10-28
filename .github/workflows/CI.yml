@@ -1,0 +1,43 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: "${{ matrix.os.name }} ${{ matrix.test.name }}"
+
+    strategy:
+      matrix:
+        os:
+          - name: Linux
+            distro: ubuntu-latest
+          - name: Windows
+            distro: windows-latest
+          - name: macOS
+            distro: macOS-latest
+        test:
+          - name: Stable
+            toolchain: stable
+            flag:
+          - name: Stable (--all-features)
+            toolchain: stable
+            flag: "--all-features"
+
+    runs-on: ${{ matrix.os.distro }}
+
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.test.toolchain }}
+          override: true
+
+      - name: Run Tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: ${{ matrix.test.flag }}

@@ -6,12 +6,10 @@ pub struct Init {
 }
 
 impl Init {
-    const_if_enabled! {
-        pub fn new() -> Init {
-            Init {
-                init_started: AtomicBool::new(false),
-                init_done: AtomicBool::new(false)
-            }
+    pub const fn new() -> Init {
+        Init {
+            init_started: AtomicBool::new(false),
+            init_done: AtomicBool::new(false)
         }
     }
 
@@ -21,7 +19,7 @@ impl Init {
     /// guaranteed to be completed.
     #[inline(always)]
     pub fn has_completed(&self) -> bool {
-        self.init_done.load(Ordering::Acquire)
+        self.init_done.load(Ordering::Relaxed)
     }
 
     /// Mark this initialization as complete, unblocking all threads that may be
@@ -31,11 +29,8 @@ impl Init {
         // If this is being called from outside of a `needed` block, we need to
         // ensure that initialization is marked as started to avoid racing with
         // future `needed` calls.
-        if !self.init_started.load(Ordering::Relaxed) {
-            self.init_started.store(true, Ordering::SeqCst);
-        }
-
-        self.init_done.store(true, Ordering::SeqCst);
+        self.init_started.compare_and_swap(false, true, Ordering::AcqRel);
+        self.init_done.store(true, Ordering::Release);
     }
 
     #[cold]

@@ -1,13 +1,11 @@
-extern crate thread_local;
-
 use std::fmt;
 
-use self::thread_local::ThreadLocal;
+use thread_local::ThreadLocal;
 use storage::Storage;
 
-pub struct LocalValue<T: Send + 'static> {
+pub struct LocalValue<T> {
     tls: ThreadLocal<T>,
-    init_fn: Box<Fn() -> T>,
+    init_fn: Box<dyn Fn() -> T>,
 }
 
 impl<T: Send + 'static> LocalValue<T> {
@@ -19,7 +17,7 @@ impl<T: Send + 'static> LocalValue<T> {
     }
 
     pub fn get(&self) -> &T {
-        self.tls.get_or(|| Box::new((self.init_fn)()))
+        self.tls.get_or(|| (self.init_fn)())
     }
 }
 
@@ -50,7 +48,6 @@ unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 ///      other words, their type does not need to implement `Sync`.
 ///   2. There is no synchronization overhead when modifying values.
 ///
-///
 /// Keep in mind that values stored in `LocalStorage` are _not_ the same across
 /// different threads. Modifications made to the stored value in one thread are
 /// _not_ visible in another. Furthermore, because Rust reuses thread IDs, a new
@@ -73,7 +70,6 @@ unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 /// The following example uses `LocalStorage` to store a per-thread count:
 ///
 /// ```rust
-/// # #![feature(const_fn)]
 /// # extern crate state;
 /// # use std::cell::Cell;
 /// # use std::thread;
@@ -82,6 +78,11 @@ unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 ///
 /// fn check_count() {
 ///     let count = COUNT.get();
+///
+///     // initialize the state, in case we reuse thread IDs
+///     count.set(0);
+///
+///     // increment it, non-atomically
 ///     count.set(count.get() + 1);
 ///
 ///     // The count should always be 1 since the state is thread-local.
@@ -104,27 +105,26 @@ unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 ///     }
 /// }
 /// ```
-pub struct LocalStorage<T: Send + 'static> {
+pub struct LocalStorage<T> {
     storage: Storage<LocalValue<T>>
 }
 
-impl<T: Send + 'static> LocalStorage<T> {
-    const_if_enabled! {
-        /// Create a new, uninitialized storage location.
-        ///
-        /// # Example
-        ///
-        /// ```rust
-        /// # #![feature(const_fn)]
-        /// use state::LocalStorage;
-        ///
-        /// static MY_GLOBAL: LocalStorage<String> = LocalStorage::new();
-        /// ```
-        pub fn new() -> LocalStorage<T> {
-            LocalStorage { storage: Storage::new() }
-        }
+impl<T> LocalStorage<T> {
+    /// Create a new, uninitialized storage location.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::LocalStorage;
+    ///
+    /// static MY_GLOBAL: LocalStorage<String> = LocalStorage::new();
+    /// ```
+    pub const fn new() -> LocalStorage<T> {
+        LocalStorage { storage: Storage::new() }
     }
+}
 
+impl<T: Send + 'static> LocalStorage<T> {
     /// Sets the initialization function for this local storage unit to
     /// `state_init` if it has not already been set before. The function will be
     /// used to initialize values on the first access from a thread with a new
@@ -136,7 +136,6 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use state::LocalStorage;
     /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
     ///
@@ -159,7 +158,6 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use state::LocalStorage;
     /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
     ///
@@ -187,7 +185,6 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # #![feature(const_fn)]
     /// # use state::LocalStorage;
     /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
     ///

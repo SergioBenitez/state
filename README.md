@@ -1,4 +1,11 @@
-# State
+# State &thinsp; [![ci.svg]][ci] [![crates.io]][crate] [![docs.rs]][docs]
+
+[crates.io]: https://img.shields.io/crates/v/state.svg
+[crate]: https://crates.io/crates/state
+[docs.rs]: https://docs.rs/state/badge.svg
+[docs]: https://docs.rs/state
+[ci.svg]: https://github.com/SergioBenitez/state/workflows/CI/badge.svg
+[ci]: https://github.com/SergioBenitez/state/actions
 
 A Rust library for safe and effortless global and thread-local state management.
 
@@ -19,7 +26,7 @@ This library can be used to easily implement:
   * Dynamic Thread-Local Data
   * Typed Containers
 
-See the [documentation](https://sergio.bz/rustdocs/state) for more.
+See the [documentation](https://docs.rs/state) for more.
 
 ## Usage
 
@@ -38,25 +45,10 @@ via the `tls` feature:
 state = { version = "0.4", features = ["tls"] }
 ```
 
-All constructors may be made `const` by enabling the `const_fn` feature:
-
-```toml
-[dependencies]
-state = { version = "0.4", features = ["const_fn"] }
-```
-
-This will require Rust nightly due to the instability of the `const_fn` feature.
-Ensure that it is enabled by adding the following to your top-level crate
-attributes:
-
-```rust
-#![feature(const_fn)]
-```
-
 ## Testing
 
 This library is extensively tested. Tests can be found in `tests/main.rs`. You
-can run the tests on Rust nightly with `cargo test --all-features`.
+can run the tests with `cargo test --all-features`.
 
 ## License
 

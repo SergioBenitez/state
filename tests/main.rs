@@ -1,5 +1,3 @@
-#![feature(const_fn)]
-
 extern crate state;
 
 use std::sync::{Arc, RwLock};
@@ -29,7 +27,6 @@ fn test_dropping_struct() {
     assert_eq!(*drop_flag.read().unwrap(), true);
 }
 
-#[cfg(feature = "const_fn")]
 mod container_tests {
     use super::{DroppingStruct, DroppingStructWrap};
     use super::state::Container;
@@ -126,8 +123,9 @@ mod container_tests {
     }
 }
 
-#[cfg(all(feature = "tls", feature = "const_fn"))]
+#[cfg(feature = "tls")]
 mod container_tests_tls {
+    use std::sync::{Arc, Barrier};
     use super::state::Container;
     use std::cell::Cell;
     use std::thread;
@@ -161,19 +159,28 @@ mod container_tests_tls {
     }
 
     #[test]
-    fn test_tls_really_is_tls() {
+    fn container_tls_really_is_tls() {
+        const THREADS: usize = 50;
+
+        let barriers = Arc::new((Barrier::new(THREADS), Barrier::new(THREADS)));
         assert!(CONTAINER.set_local(|| Cell::new(0u8)));
 
         let mut threads = vec![];
-        for i in 1..50 {
+        for i in 1..THREADS {
+            let barriers = barriers.clone();
             threads.push(thread::spawn(move || {
+                barriers.0.wait();
                 assert_eq!(CONTAINER.get_local::<Cell<u8>>().get(), 0);
-                CONTAINER.get_local::<Cell<u8>>().set(i);
+                CONTAINER.get_local::<Cell<u8>>().set(i as u8);
                 let v = CONTAINER.get_local::<Cell<u8>>().get();
-                ::std::thread::sleep(::std::time::Duration::from_millis(500));
+                barriers.1.wait();
                 v
             }));
         }
+
+        barriers.0.wait();
+        CONTAINER.get_local::<Cell<u8>>().set(0);
+        barriers.1.wait();
 
         let vals = threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>();
         for (i, val) in vals.into_iter().enumerate() {
@@ -184,7 +191,7 @@ mod container_tests_tls {
     }
 
     #[test]
-    fn test_tls_really_is_tls_take_2() {
+    fn container_tls_really_is_tls_take_2() {
         thread::spawn(|| {
             assert!(CONTAINER.set_local(|| Cell::new(1i8)));
             CONTAINER.get_local::<Cell<i8>>().set(2);
@@ -196,7 +203,6 @@ mod container_tests_tls {
     }
 }
 
-#[cfg(feature = "const_fn")]
 mod storage_tests {
     use super::DroppingStruct;
     use super::state::Storage;
@@ -278,8 +284,10 @@ mod storage_tests {
 #[cfg(feature = "tls")]
 mod storage_tests_tls {
     use super::state::LocalStorage;
+
     use std::thread;
     use std::cell::Cell;
+    use std::sync::{Arc, Barrier};
 
     #[test]
     fn simple_put_get() {
@@ -317,17 +325,28 @@ mod storage_tests_tls {
     }
 
     #[test]
-    fn tls_really_is_tls() {
+    fn storage_tls_really_is_tls() {
+        const THREADS: usize = 50;
         static STORAGE: LocalStorage<Cell<u8>> = LocalStorage::new();
+
+        let barriers = Arc::new((Barrier::new(THREADS), Barrier::new(THREADS)));
         assert!(STORAGE.set(|| Cell::new(0)));
 
         let mut threads = vec![];
         for i in 1..50 {
+            let barriers = barriers.clone();
             threads.push(thread::spawn(move || {
+                barriers.0.wait();
                 STORAGE.get().set(i);
-                STORAGE.get().get()
+                let val = STORAGE.get().get();
+                barriers.1.wait();
+                val
             }));
         }
+
+        barriers.0.wait();
+        STORAGE.get().set(0);
+        barriers.1.wait();
 
         let vals = threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>();
         for (i, val) in vals.into_iter().enumerate() {
@@ -338,7 +357,7 @@ mod storage_tests_tls {
     }
 
     #[test]
-    fn tls_really_is_tls_take_2() {
+    fn storage_tls_really_is_tls_take_2() {
         static STORAGE: LocalStorage<Cell<u8>> = LocalStorage::new();
 
         thread::spawn(|| {
