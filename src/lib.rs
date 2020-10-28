@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/state/0.4.1")]
+#![doc(html_root_url = "https://docs.rs/state/0.4.2")]
 
 //! # state - safe and effortless state management
 //!

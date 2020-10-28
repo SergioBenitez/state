@@ -1,11 +1,11 @@
 [package]
 name = "state"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Sergio Benitez <sb@sergio.bz>"]
 description = """
 A library for safe and effortless global and thread-local state management.
 """
-documentation = "https://docs.rs/state/0.4.1"
+documentation = "https://docs.rs/state/0.4.2"
 repository = "https://github.com/SergioBenitez/state"
 readme = "README.md"
 keywords = ["static", "tls", "state", "thread-local", "global"]
@@ -16,7 +16,7 @@ tls = ["lazy_static"]
 const_fn = [] # here for backwards compatibility in 0.4.x only
 
 [dependencies]
-lazy_static = { version = "*", optional = true }
+lazy_static = { version = "1", optional = true }
 
 [profile.release]
 opt-level = 3
