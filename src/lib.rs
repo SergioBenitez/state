@@ -1,15 +1,14 @@
 #![doc(html_root_url = "https://docs.rs/state/0.4.2")]
+#![warn(missing_docs)]
 
-//! # state - safe and effortless state management
+//! # Safe, Effortless `state` Management
 //!
 //! This crate allows you to safely and effortlessly manage global and/or
 //! thread-local state. Three primitives are provided for state management:
 //!
-//!  * **[Container](struct.Container.html):** Type-based global and
-//!  thread-local storage for many values.
-//!  * **[Storage](struct.Storage.html):** Global storage for a single instance.
-//!  * **[LocalStorage](struct.LocalStorage.html):** Thread-local storage for a
-//!  single instance.
+//!  * **[`struct@Container`]:** Type-based storage for many values.
+//!  * **[`Storage`]:** Lazy storage for a single value.
+//!  * **[`LocalStorage`]:** Thread-local storage for a single value.
 //!
 //! ## Usage
 //!
@@ -29,6 +28,40 @@
 //! ```
 //!
 //! ## Use Cases
+//!
+//! ### Memoizing Expensive Operations
+//!
+//! The [`Storage`] type can be used to conveniently memoize expensive
+//! read-based operations without needing to mutably borrow. Consider a `struct`
+//! with a field `value` and method `compute()` that performs an expensive
+//! operation on `value` to produce a derived value. We can use `Storage` to
+//! memoize `compute()`:
+//!
+//! ```rust
+//! use state::Storage;
+//!
+//! struct Value;
+//! struct DerivedValue;
+//!
+//! struct Foo {
+//!     value: Value,
+//!     cached: Storage<DerivedValue>
+//! }
+//!
+//! impl Foo {
+//!     fn set_value(&mut self, v: Value) {
+//!         self.value = v;
+//!         self.cached = Storage::new();
+//!     }
+//!
+//!     fn compute(&self) -> &DerivedValue {
+//!         self.cached.get_or_set(|| {
+//!             let _value = &self.value;
+//!             unimplemented!("expensive computation with `self.value`")
+//!         })
+//!     }
+//! }
+//! ```
 //!
 //! ### Read-Only Singleton
 //!
@@ -62,8 +95,7 @@
 //!      `RwLock<Option<Configuration>>` to `Some`. Retrieve by `lock`ing and
 //!      checking for `Some`, paying the cost of synchronization.
 //!
-//! With `state`, you can use [LocalStorage](struct.LocalStorage.html) and call
-//! `set` and `get`, as follows:
+//! With `state`, you can use [`LocalStorage`] as follows:
 //!
 //! ```rust
 //! # extern crate state;
@@ -88,6 +120,8 @@
 //! # #[cfg(not(feature = "tls"))]
 //! # fn main() {  }
 //! ```
+//!
+//! Note that you can _also_ use [`Storage`] to the same effect.
 //!
 //! ### Read/Write Singleton
 //!
@@ -208,7 +242,7 @@
 extern crate lazy_static;
 
 mod ident_hash;
-mod container;
+#[doc(hidden)] pub mod container;
 mod storage;
 mod init;
 #[cfg(feature = "tls")] mod thread_local;

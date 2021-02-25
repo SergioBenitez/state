@@ -1,15 +1,15 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering::{AcqRel, Acquire, Release, Relaxed}};
 
 pub struct Init {
-    init_started: AtomicBool,
-    init_done: AtomicBool
+    started: AtomicBool,
+    done: AtomicBool
 }
 
 impl Init {
     pub const fn new() -> Init {
         Init {
-            init_started: AtomicBool::new(false),
-            init_done: AtomicBool::new(false)
+            started: AtomicBool::new(false),
+            done: AtomicBool::new(false)
         }
     }
 
@@ -19,7 +19,7 @@ impl Init {
     /// guaranteed to be completed.
     #[inline(always)]
     pub fn has_completed(&self) -> bool {
-        self.init_done.load(Ordering::Relaxed)
+        self.done.load(Relaxed)
     }
 
     /// Mark this initialization as complete, unblocking all threads that may be
@@ -27,27 +27,27 @@ impl Init {
     #[inline(always)]
     pub fn mark_complete(&self) {
         // If this is being called from outside of a `needed` block, we need to
-        // ensure that initialization is marked as started to avoid racing with
-        // future `needed` calls.
-        self.init_started.compare_and_swap(false, true, Ordering::AcqRel);
-        self.init_done.store(true, Ordering::Release);
+        // ensure that `started` is `true` to avoid racing with (return `true`
+        // to) future `needed` calls.
+        self.started.store(true, Release);
+        self.done.store(true, Release);
     }
 
     #[cold]
     #[inline(always)]
     fn try_to_need_init(&self) -> bool {
         // Quickly check if initialization has already started elsewhere.
-        if self.init_started.load(Ordering::Relaxed) {
+        if self.started.load(Relaxed) {
             // If it has, wait until it's finished before returning. Finishing
             // is marked by calling `mark_complete`.
-            while !self.init_done.load(Ordering::Acquire) { }
+            while !self.done.load(Acquire) { }
             return false;
         }
 
         // Try to be the first. If we lose (init_started is true), we wait.
-        if self.init_started.compare_and_swap(false, true, Ordering::AcqRel) {
+        if self.started.compare_exchange(false, true, AcqRel, Relaxed).is_err() {
             // Another compare_and_swap won. Wait until they're done.
-            while !self.init_done.load(Ordering::Acquire) { }
+            while !self.done.load(Acquire) { }
             return false;
         }
 
@@ -65,7 +65,7 @@ impl Init {
     #[inline(always)]
     pub fn needed(&self) -> bool {
         // Quickly check if initialization has finished, and return if so.
-        if self.init_done.load(Ordering::Relaxed) {
+        if self.done.load(Relaxed) {
             return false;
         }
 

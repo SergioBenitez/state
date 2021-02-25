@@ -36,7 +36,7 @@ mod container_tests {
     // We use one `CONTAINER` to get an implicit test since each `test` runs in
     // a different thread. This means we have to `set` different types in each
     // test if we want the `set` to succeed.
-    static CONTAINER: Container = Container::new();
+    static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
 
     #[test]
     fn simple_set_get() {
@@ -109,7 +109,7 @@ mod container_tests {
         let dropping_struct_b = DroppingStructWrap(DroppingStruct(drop_flag_b.clone()));
 
         {
-            let container = Container::new();
+            let container = <Container![Send + Sync]>::new();
             container.set(dropping_struct_a);
             assert_eq!(*drop_flag_a.read().unwrap(), false);
 
@@ -133,7 +133,7 @@ mod container_tests_tls {
     // We use one `CONTAINER` to get an implicit test since each `test` runs in
     // a different thread. This means we have to `set` different types in each
     // test if we want the `set` to succeed.
-    static CONTAINER: Container = Container::new();
+    static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
 
     #[test]
     fn test_simple() {

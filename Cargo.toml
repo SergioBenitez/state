@@ -18,6 +18,9 @@ const_fn = [] # here for backwards compatibility in 0.4.x only
 [dependencies]
 lazy_static = { version = "1", optional = true }
 
+[dev-dependencies]
+static_assertions = "1.1.0"
+
 [profile.release]
 opt-level = 3
 lto = true

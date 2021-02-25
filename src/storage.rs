@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::cell::UnsafeCell;
 use std::fmt;
 
@@ -13,8 +12,7 @@ use init::Init;
 /// [try_get](#method.try_get) can be used to determine whether the `Storage`
 /// has been initialized before attempting to retrieve the value.
 ///
-/// For safety reasons, values stored in `Storage` must be `Send + Sync +
-/// 'static`.
+/// For safety reasons, values stored in `Storage` must be `Send + Sync`.
 ///
 /// # Example
 ///
@@ -49,7 +47,6 @@ use init::Init;
 ///     assert_eq!(map.get("another_key").unwrap(), "another_value");
 /// }
 pub struct Storage<T> {
-    _phantom: PhantomData<T>,
     item: UnsafeCell<Option<T>>,
     init: Init
 }
@@ -66,14 +63,13 @@ impl<T> Storage<T> {
     /// ```
     pub const fn new() -> Storage<T> {
         Storage {
-            _phantom: PhantomData,
             item: UnsafeCell::new(None),
             init: Init::new()
         }
     }
 }
 
-impl<T: Send + Sync + 'static> Storage<T> {
+impl<T: Send + Sync> Storage<T> {
     /// Sets the value for this storage unit to `value` if it has not already
     /// been set before.
     ///
@@ -131,9 +127,8 @@ impl<T: Send + Sync + 'static> Storage<T> {
     ///
     /// # Panics
     ///
-    /// Panics if a value has not previously been
-    /// [set](#method.set). Use [try_get](#method.try_get) for a non-panicking
-    /// version.
+    /// Panics if a value has not previously been [`set()`](#method.set). Use
+    /// [`try_get()`](#method.try_get) for a non-panicking version.
     ///
     /// # Example
     ///
@@ -170,13 +165,70 @@ impl<T: Send + Sync + 'static> Storage<T> {
             self.get()
         }
     }
+
+    /// Returns a mutable reference to the underlying data if any is set.
+    ///
+    /// This call borrows `Storage` mutably (at compile-time) so there is no
+    /// need for dynamic checks.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::Storage;
+    ///
+    /// let mut storage = Storage::from(5);
+    /// *storage.try_get_mut().unwrap() += 1;
+    ///
+    /// let mut storage: Storage<usize> = Storage::new();
+    /// assert!(storage.try_get_mut().is_none());
+    /// ```
+    pub fn try_get_mut(&mut self) -> Option<&mut T> {
+        self.item.get_mut().as_mut()
+    }
+
+    /// Returns the inner value if any is set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::Storage;
+    ///
+    /// let storage = Storage::from(5);
+    /// assert_eq!(storage.into_inner().unwrap(), 5);
+    ///
+    /// let storage: Storage<usize> = Storage::new();
+    /// assert!(storage.into_inner().is_none());
+    /// ```
+    pub fn into_inner(self) -> Option<T> {
+        self.item.into_inner()
+    }
+
+    /// Applies the function `f` to the inner value, if there is any, and
+    /// returns a new `Storage` with mapped value.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::Storage;
+    ///
+    /// let storage = Storage::from(5);
+    /// assert_eq!(storage.get(), &5);
+    ///
+    /// let storage = storage.map(|v| v + 10);
+    /// assert_eq!(storage.get(), &15);
+    /// ```
+    pub fn map<U: Send + Sync, F: FnOnce(T) -> U>(self, f: F) -> Storage<U> {
+        self.into_inner()
+            .map(|v| Storage::from(f(v)))
+            .unwrap_or_else(|| Storage::new())
+    }
 }
 
-unsafe impl<T: Send + Sync + 'static> Sync for Storage<T> {  }
+unsafe impl<T: Send + Sync> Sync for Storage<T> {  }
 
-unsafe impl<T: Send + Sync + 'static> Send for Storage<T> {  }
+unsafe impl<T: Send + Sync> Send for Storage<T> {  }
 
-impl<T: fmt::Debug + Send + Sync + 'static> fmt::Debug for Storage<T> {
+impl<T: fmt::Debug + Send + Sync> fmt::Debug for Storage<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self.try_get() {
             Some(object) => object.fmt(f),
@@ -185,7 +237,7 @@ impl<T: fmt::Debug + Send + Sync + 'static> fmt::Debug for Storage<T> {
     }
 }
 
-impl<T: Send + Sync + 'static> From<T> for Storage<T> {
+impl<T: Send + Sync> From<T> for Storage<T> {
     fn from(value: T) -> Storage<T> {
         let storage = Storage::new();
         assert!(storage.set(value));
@@ -193,7 +245,7 @@ impl<T: Send + Sync + 'static> From<T> for Storage<T> {
     }
 }
 
-impl<T: Clone + Send + Sync + 'static> Clone for Storage<T> {
+impl<T: Clone + Send + Sync> Clone for Storage<T> {
     fn clone(&self) -> Storage<T> {
         match self.try_get() {
             Some(val) => Storage::from(val.clone()),

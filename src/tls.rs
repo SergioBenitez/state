@@ -37,22 +37,27 @@ unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 /// method. The [try_get](#method.try_get) can be used to determine whether the
 /// `LocalStorage` has been initialized before attempting to retrieve a value.
 ///
-/// For safety reasons, values stored in `Storage` must be `Send + 'static`.
+/// For safety reasons, values stored in `LocalStorage` must be `Send +
+/// 'static`.
 ///
 /// # Comparison with `Storage`
 ///
 /// When the use-case allows, there are two primary advantages to using a
 /// `LocalStorage` instance over a `Storage` instance:
 ///
-///   1. Values stored in `LocalStorage` do not need to be thread-safe. In
-///      other words, their type does not need to implement `Sync`.
-///   2. There is no synchronization overhead when modifying values.
+///   * Values stored in `LocalStorage` do not need to implement `Sync`.
+///   * There is no synchronization overhead when setting a value.
 ///
-/// Keep in mind that values stored in `LocalStorage` are _not_ the same across
-/// different threads. Modifications made to the stored value in one thread are
-/// _not_ visible in another. Furthermore, because Rust reuses thread IDs, a new
-/// thread is _not_ guaranteed to receive a newly initialized value on its first
-/// call to `get`.
+/// The primary disadvantages are:
+///
+///   * Values are recomputed once per thread on `get()` where `Storage` never
+///     recomputes values.
+///   * Values need to be `'static` where `Storage` imposes no such restriction.
+///
+/// Values `LocalStorage` are _not_ the same across different threads. Any
+/// modifications made to the stored value in one thread are _not_ visible in
+/// another. Furthermore, because Rust reuses thread IDs, a new thread is _not_
+/// guaranteed to receive a newly initialized value on its first call to `get`.
 ///
 /// # Usage
 ///
