@@ -202,11 +202,10 @@ impl AnyObject {
         unsafe { std::mem::transmute(any) }
     }
 
-    fn deanonymize<T: 'static>(&self) -> &T {
-        unsafe {
-            let any: *const *const dyn Any = std::mem::transmute(self);
-            &*(*any as *const dyn Any as *const T)
-        }
+    // SAFETY: The caller must ensure that `self` was derived from a `T`.
+    unsafe fn deanonymize<T: 'static>(&self) -> &T {
+        let any: *const *const dyn Any = std::mem::transmute(self);
+        &*(*any as *const dyn Any as *const T)
     }
 }
 
@@ -482,6 +481,44 @@ impl<K: kind::Kind> Container<K> {
         !already_set
     }
 
+    // Initializes the `map` if needed and returns it.
+    //
+    // SAFETY: Caller must ensure mutual exclusion of calls to this function
+    // and/or calls to `map_mut`.
+    #[inline(always)]
+    unsafe fn map_ref(&self) -> &TypeMap {
+        self.init_map_if_needed();
+        (*self.map.get()).as_ref().unwrap()
+    }
+
+    /// SAFETY: The caller needs to ensure that the `T` returned from the `f` is
+    /// not dependent on the stability of memory slots in the map. It also needs
+    /// to ensure that `f` does not panic if liveness is desired.
+    unsafe fn with_map_ref<'a, F, T: 'a>(&'a self, f: F) -> T
+        where F: FnOnce(&'a TypeMap) -> T
+    {
+        // If we're frozen, there can't be any concurrent writers, so we're
+        // free to read this safely without taking a lock.
+        if self.is_frozen() {
+            f(self.map_ref())
+        } else {
+            self.lock();
+            let result = f(self.map_ref());
+            self.unlock();
+            result
+        }
+    }
+
+    // Initializes the `map` if needed and returns it.
+    //
+    // SAFETY: Caller must ensure mutual exclusion of calls to this function
+    // and/or calls to `map_ref`.
+    #[inline(always)]
+    unsafe fn map_mut(&self) -> &mut TypeMap {
+        self.init_map_if_needed();
+        (*self.map.get()).as_mut().unwrap()
+    }
+
     /// Attempts to retrieve the global state for type `T`.
     ///
     /// Returns `Some` if the state has previously been [set](#method.set).
@@ -507,22 +544,15 @@ impl<K: kind::Kind> Container<K> {
     /// ```
     #[inline]
     pub fn try_get<T: 'static>(&self) -> Option<&T> {
+        // SAFETY: `deanonymization` takes a potentially unstable refrence to an
+        // `AnyObject` and converts it into a stable address. The inner item is
+        // never dropped until `self` is dropped: it is never replaced.
+        // SAFETY: The map mapes `type_id` to `ptr`, so we know that `ptr` is
+        // indeed of type `T`.
         unsafe {
-            // If we're frozen, there can't be any concurrent writers, so we're
-            // free to read this safely without taking a lock.
-            let type_id = TypeId::of::<T>();
-            let item = if self.is_frozen() {
-                let map = self.map_ref();
-                map.get(&type_id)
-            } else {
-                self.lock();
-                let map = self.map_ref();
-                let item = map.get(&type_id);
-                self.unlock();
-                item
-            };
-
-            item.map(|ptr| ptr.deanonymize())
+            self.with_map_ref(|map| {
+                map.get(&TypeId::of::<T>()).map(|ptr| ptr.deanonymize())
+            })
         }
     }
 
@@ -603,32 +633,36 @@ impl<K: kind::Kind> Container<K> {
         self.frozen.load(Ordering::Relaxed)
     }
 
+    /// Returns the number of distinctly typed values in the containers.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::Container;
+    ///
+    /// let container = <Container![Send + Sync]>::new();
+    /// assert_eq!(container.len(), 0);
+    ///
+    /// assert_eq!(container.set(1usize), true);
+    /// assert_eq!(container.len(), 1);
+    ///
+    /// assert_eq!(container.set(2usize), false);
+    /// assert_eq!(container.len(), 1);
+    ///
+    /// assert_eq!(container.set(1u8), true);
+    /// assert_eq!(container.len(), 2);
+    /// ```
+    pub fn len(&self) -> usize {
+        // SAFETY: We retrieve a `usize`, which is clearly stable.
+        unsafe { self.with_map_ref(|map| map.len()) }
+    }
+
     // Initializes the `map` if needed.
     unsafe fn init_map_if_needed(&self) {
         if self.init.needed() {
             *self.map.get() = Some(HashMap::<_, _, _>::default());
             self.init.mark_complete();
         }
-    }
-
-    // Initializes the `map` if needed and returns it.
-    //
-    // SAFETY: Caller must ensure mutual exclusion of calls to this function
-    // and/or calls to `map_ref`.
-    #[inline(always)]
-    unsafe fn map_mut(&self) -> &mut TypeMap {
-        self.init_map_if_needed();
-        (*self.map.get()).as_mut().unwrap()
-    }
-
-    // Initializes the `map` if needed and returns it.
-    //
-    // SAFETY: Caller must ensure mutual exclusion of calls to this function
-    // and/or calls to `map_mut`.
-    #[inline(always)]
-    unsafe fn map_ref(&self) -> &TypeMap {
-        self.init_map_if_needed();
-        (*self.map.get()).as_ref().unwrap()
     }
 
     #[inline(always)]
@@ -639,5 +673,13 @@ impl<K: kind::Kind> Container<K> {
     #[inline(always)]
     fn unlock(&self) {
         assert!(self.mutex.compare_exchange(1, 0, Ordering::AcqRel, Ordering::Relaxed).is_ok());
+    }
+}
+
+impl<K: kind::Kind> std::fmt::Debug for Container<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Container")
+            .field("len", &self.len())
+            .finish()
     }
 }
