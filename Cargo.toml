@@ -10,6 +10,7 @@ repository = "https://github.com/SergioBenitez/state"
 readme = "README.md"
 keywords = ["static", "tls", "state", "thread-local", "global"]
 license = "MIT/Apache-2.0"
+edition = "2018"
 
 [features]
 tls = ["lazy_static"]
@@ -31,3 +32,6 @@ lto = true
 
 [package.metadata.docs.rs]
 all-features = true
+
+[target.'cfg(loom)'.dependencies]
+loom = { version = "0.3", features = ["checkpoint"] }

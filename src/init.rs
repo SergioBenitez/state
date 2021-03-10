@@ -1,4 +1,5 @@
-use std::sync::atomic::{AtomicBool, Ordering::{AcqRel, Acquire, Release, Relaxed}};
+use crate::sync::atomic::{AtomicBool, Ordering::{AcqRel, Acquire, Release, Relaxed}};
+use crate::thread::yield_now;
 
 pub struct Init {
     started: AtomicBool,
@@ -6,7 +7,16 @@ pub struct Init {
 }
 
 impl Init {
+    #[cfg(not(loom))]
     pub const fn new() -> Init {
+        Init {
+            started: AtomicBool::new(false),
+            done: AtomicBool::new(false)
+        }
+    }
+
+    #[cfg(loom)]
+    pub fn new() -> Init {
         Init {
             started: AtomicBool::new(false),
             done: AtomicBool::new(false)
@@ -40,14 +50,14 @@ impl Init {
         if self.started.load(Relaxed) {
             // If it has, wait until it's finished before returning. Finishing
             // is marked by calling `mark_complete`.
-            while !self.done.load(Acquire) { }
+            while !self.done.load(Acquire) { yield_now() }
             return false;
         }
 
         // Try to be the first. If we lose (init_started is true), we wait.
         if self.started.compare_exchange(false, true, AcqRel, Relaxed).is_err() {
             // Another compare_and_swap won. Wait until they're done.
-            while !self.done.load(Acquire) { }
+            while !self.done.load(Acquire) { yield_now() }
             return false;
         }
 

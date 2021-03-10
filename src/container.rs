@@ -5,11 +5,11 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::any::{Any, TypeId};
 
-use init::Init;
-use ident_hash::IdentHash;
+use crate::init::Init;
+use crate::ident_hash::IdentHash;
 
 #[cfg(feature = "tls")]
-use tls::LocalValue;
+use crate::tls::LocalValue;
 
 /// A container for global type-based state.
 ///
@@ -232,7 +232,13 @@ impl Container<kind::SendSync> {
     ///
     /// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
     /// ```
+    #[cfg(not(loom))]
     pub const fn new() -> Self {
+        new!()
+    }
+
+    #[cfg(loom)]
+    pub fn new() -> Self {
         new!()
     }
 

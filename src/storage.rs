@@ -1,7 +1,7 @@
-use std::cell::UnsafeCell;
 use std::fmt;
+use crate::cell::UnsafeCell;
 
-use init::Init;
+use crate::init::Init;
 
 /// A single storage location for global access to a value.
 ///
@@ -61,7 +61,16 @@ impl<T> Storage<T> {
     ///
     /// static MY_GLOBAL: Storage<String> = Storage::new();
     /// ```
+    #[cfg(not(loom))]
     pub const fn new() -> Storage<T> {
+        Storage {
+            item: UnsafeCell::new(None),
+            init: Init::new()
+        }
+    }
+
+    #[cfg(loom)]
+    pub fn new() -> Storage<T> {
         Storage {
             item: UnsafeCell::new(None),
             init: Init::new()
@@ -86,12 +95,17 @@ impl<T: Send + Sync> Storage<T> {
     /// assert_eq!(MY_GLOBAL.set("Goodbye, world!"), false);
     /// ```
     pub fn set(&self, value: T) -> bool {
+        println!("Set!");
         if self.init.needed() {
-            unsafe { *self.item.get() = Some(value); }
+            println!("Set: writing.");
+            unsafe { self.item.with_mut(|ptr| *ptr = Some(value)); }
+            println!("Set: written. Marking.");
             self.init.mark_complete();
+            println!("Set: marked.");
             return true;
         }
 
+        println!("Set: not needed.");
         false
     }
 
@@ -114,12 +128,15 @@ impl<T: Send + Sync> Storage<T> {
     /// ```
     #[inline]
     pub fn try_get(&self) -> Option<&T> {
+        println!("Get!");
         if !self.init.has_completed() {
+            println!("Get: no value.");
             return None
         }
 
+        println!("Get: reading.");
         unsafe {
-            (*self.item.get()).as_ref()
+            self.item.with(|ptr| (*ptr).as_ref())
         }
     }
 

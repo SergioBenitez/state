@@ -248,6 +248,15 @@ mod init;
 #[cfg(feature = "tls")] mod thread_local;
 #[cfg(feature = "tls")] mod tls;
 
+mod shim;
+pub(crate) use shim::*;
+
 pub use container::Container;
 pub use storage::Storage;
 #[cfg(feature = "tls")] pub use tls::LocalStorage;
+
+#[cfg(loom)]
+#[path = "."]
+pub mod private {
+    pub mod init;
+}
