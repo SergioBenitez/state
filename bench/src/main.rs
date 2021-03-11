@@ -10,13 +10,15 @@ use std::cell::Cell;
 
 use test::Bencher;
 
+type Container = state::Container![Send + Sync];
+
 lazy_static! {
     static ref ATOMIC: AtomicUsize = AtomicUsize::new(0);
 }
 
 #[bench]
 fn container_get(b: &mut Bencher) {
-    static STATE: state::Container = state::Container::new();
+    static STATE: Container = Container::new();
     STATE.set(AtomicUsize::new(0));
 
     b.iter(|| {
@@ -46,7 +48,7 @@ fn local_storage_get(b: &mut Bencher) {
 
 #[bench]
 fn container_local_get(b: &mut Bencher) {
-    static STATE: state::Container = state::Container::new();
+    static STATE: Container = Container::new();
     STATE.set_local(|| AtomicUsize::new(0));
 
     b.iter(|| {
@@ -63,7 +65,7 @@ fn lazy_static_get(b: &mut Bencher) {
 
 #[bench]
 fn container_get_many_threads(b: &mut Bencher) {
-    static STATE: state::Container = state::Container::new();
+    static STATE: Container = Container::new();
     STATE.set(AtomicUsize::new(0));
 
     b.iter(|| {
@@ -80,7 +82,7 @@ fn container_get_many_threads(b: &mut Bencher) {
 
 #[bench]
 fn container_local_get_many_threads(b: &mut Bencher) {
-    static STATE: state::Container = state::Container::new();
+    static STATE: Container = Container::new();
     STATE.set_local(|| AtomicUsize::new(0));
 
     b.iter(|| {
@@ -88,6 +90,28 @@ fn container_local_get_many_threads(b: &mut Bencher) {
         for _ in 0..100 {
             threads.push(thread::spawn(|| {
                 STATE.get_local::<AtomicUsize>().load(Ordering::Relaxed)
+            }));
+        }
+
+        threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>()
+    });
+}
+
+#[bench]
+fn container_freeze_many_threads(b: &mut Bencher) {
+    use std::sync::Arc;
+
+    let mut state: Container = Container::new();
+    state.set(AtomicUsize::new(0));
+    state.freeze();
+
+    let state = Arc::new(state);
+    b.iter(|| {
+        let mut threads = vec![];
+        for _ in 0..100 {
+            let state = state.clone();
+            threads.push(thread::spawn(move || {
+                state.get::<AtomicUsize>().load(Ordering::Relaxed)
             }));
         }
 
