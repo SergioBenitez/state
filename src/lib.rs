@@ -255,8 +255,10 @@ pub use container::Container;
 pub use storage::Storage;
 #[cfg(feature = "tls")] pub use tls::LocalStorage;
 
+/// Exports for use by loom tests but otherwise private.
 #[cfg(loom)]
 #[path = "."]
 pub mod private {
+    /// The `Init` type.
     pub mod init;
 }

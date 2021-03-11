@@ -1,6 +1,6 @@
 use std::fmt;
-use crate::cell::UnsafeCell;
 
+use crate::cell::UnsafeCell;
 use crate::init::Init;
 
 /// A single storage location for global access to a value.
@@ -69,6 +69,7 @@ impl<T> Storage<T> {
         }
     }
 
+    /// New, for loom.
     #[cfg(loom)]
     pub fn new() -> Storage<T> {
         Storage {
@@ -95,17 +96,12 @@ impl<T: Send + Sync> Storage<T> {
     /// assert_eq!(MY_GLOBAL.set("Goodbye, world!"), false);
     /// ```
     pub fn set(&self, value: T) -> bool {
-        println!("Set!");
         if self.init.needed() {
-            println!("Set: writing.");
             unsafe { self.item.with_mut(|ptr| *ptr = Some(value)); }
-            println!("Set: written. Marking.");
             self.init.mark_complete();
-            println!("Set: marked.");
             return true;
         }
 
-        println!("Set: not needed.");
         false
     }
 
@@ -128,13 +124,10 @@ impl<T: Send + Sync> Storage<T> {
     /// ```
     #[inline]
     pub fn try_get(&self) -> Option<&T> {
-        println!("Get!");
         if !self.init.has_completed() {
-            println!("Get: no value.");
             return None
         }
 
-        println!("Get: reading.");
         unsafe {
             self.item.with(|ptr| (*ptr).as_ref())
         }

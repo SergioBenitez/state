@@ -1,12 +1,13 @@
-use std::cell::UnsafeCell;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::any::{Any, TypeId};
 
 use crate::init::Init;
 use crate::ident_hash::IdentHash;
+use crate::cell::UnsafeCell;
+use crate::sync::atomic::{AtomicUsize, Ordering};
+use crate::thread::yield_now;
 
 #[cfg(feature = "tls")]
 use crate::tls::LocalValue;
@@ -143,7 +144,7 @@ pub struct Container<K: kind::Kind> {
     init: Init,
     map: UnsafeCell<Option<TypeMap>>,
     mutex: AtomicUsize,
-    frozen: AtomicBool,
+    frozen: bool,
     _kind: PhantomData<K>
 }
 
@@ -179,7 +180,7 @@ macro_rules! new {
             init: Init::new(),
             map: UnsafeCell::new(None),
             mutex: AtomicUsize::new(0),
-            frozen: AtomicBool::new(false),
+            frozen: false,
             _kind: PhantomData,
         }
     )
@@ -188,7 +189,9 @@ macro_rules! new {
 type TypeMap = HashMap<TypeId, AnyObject, BuildHasherDefault<IdentHash>>;
 
 /// FIXME: This is a hack so we can create a *mut dyn Any with a `const`. It
-/// depends on trait objects being represented in this way.
+/// simply erases `dyn Any`; `transmute` ensures that a `*mut dyn Any` and an
+/// `AnyObject` have the same size. The field order doesn't matter since we
+/// never read the fields directly: we just need the sizes to be the same.
 #[repr(C)]
 struct AnyObject {
     data: *mut (),
@@ -202,10 +205,12 @@ impl AnyObject {
         unsafe { std::mem::transmute(any) }
     }
 
-    // SAFETY: The caller must ensure that `self` was derived from a `T`.
-    unsafe fn deanonymize<T: 'static>(&self) -> &T {
-        let any: *const *const dyn Any = std::mem::transmute(self);
-        &*(*any as *const dyn Any as *const T)
+    fn deanonymize<T: 'static>(&self) -> Option<&T> {
+        unsafe {
+            let any: *const *const dyn Any = std::mem::transmute(self);
+            let any: &dyn Any = &*(*any as *const dyn Any);
+            any.downcast_ref()
+        }
     }
 }
 
@@ -291,7 +296,7 @@ impl Container<kind::SendSync> {
     #[inline]
     #[cfg(feature = "tls")]
     pub fn set_local<T, F>(&self, state_init: F) -> bool
-        where T: Send + 'static, F: Fn() -> T + 'static
+        where T: Send + 'static, F: Fn() -> T + Send + Sync + 'static
     {
         self.set::<LocalValue<T>>(LocalValue::new(state_init))
     }
@@ -468,6 +473,34 @@ impl Container<kind::Neither> {
 #[cfg(test)] static_assertions::assert_not_impl_any!(Container<kind::Neither>: Send, Sync);
 
 impl<K: kind::Kind> Container<K> {
+    // Initializes the `map` if needed.
+    unsafe fn init_map_if_needed(&self) {
+        if self.init.needed() {
+            self.map.with_mut(|ptr| *ptr = Some(HashMap::<_, _, _>::default()));
+            self.init.mark_complete();
+        }
+    }
+
+    // Initializes the `map` if needed and returns a mutable ref to it.
+    //
+    // SAFETY: Caller must ensure mutual exclusion of calls to this function
+    // and/or calls to `map_ref`.
+    #[inline(always)]
+    unsafe fn map_mut(&self) -> &mut TypeMap {
+        self.init_map_if_needed();
+        self.map.with_mut(|ptr| (*ptr).as_mut().unwrap())
+    }
+
+    // Initializes the `map` if needed and returns an immutable ref to it.
+    //
+    // SAFETY: Caller must ensure mutual exclusion of calls to this function
+    // and/or calls to `map_mut`.
+    #[inline(always)]
+    unsafe fn map_ref(&self) -> &TypeMap {
+        self.init_map_if_needed();
+        self.map.with(|ptr| (*ptr).as_ref().unwrap())
+    }
+
     /// SAFETY: The caller needs to ensure that `T` has the required bounds
     /// `Sync` or `Send` bounds.
     unsafe fn _set<T: 'static>(&self, state: T) -> bool {
@@ -487,16 +520,6 @@ impl<K: kind::Kind> Container<K> {
         !already_set
     }
 
-    // Initializes the `map` if needed and returns it.
-    //
-    // SAFETY: Caller must ensure mutual exclusion of calls to this function
-    // and/or calls to `map_mut`.
-    #[inline(always)]
-    unsafe fn map_ref(&self) -> &TypeMap {
-        self.init_map_if_needed();
-        (*self.map.get()).as_ref().unwrap()
-    }
-
     /// SAFETY: The caller needs to ensure that the `T` returned from the `f` is
     /// not dependent on the stability of memory slots in the map. It also needs
     /// to ensure that `f` does not panic if liveness is desired.
@@ -513,16 +536,6 @@ impl<K: kind::Kind> Container<K> {
             self.unlock();
             result
         }
-    }
-
-    // Initializes the `map` if needed and returns it.
-    //
-    // SAFETY: Caller must ensure mutual exclusion of calls to this function
-    // and/or calls to `map_ref`.
-    #[inline(always)]
-    unsafe fn map_mut(&self) -> &mut TypeMap {
-        self.init_map_if_needed();
-        (*self.map.get()).as_mut().unwrap()
     }
 
     /// Attempts to retrieve the global state for type `T`.
@@ -551,13 +564,12 @@ impl<K: kind::Kind> Container<K> {
     #[inline]
     pub fn try_get<T: 'static>(&self) -> Option<&T> {
         // SAFETY: `deanonymization` takes a potentially unstable refrence to an
-        // `AnyObject` and converts it into a stable address. The inner item is
-        // never dropped until `self` is dropped: it is never replaced.
-        // SAFETY: The map mapes `type_id` to `ptr`, so we know that `ptr` is
-        // indeed of type `T`.
+        // `AnyObject` and converts it into a stable address: it is converting
+        // an `&Box<dyn Any>` into the inner `&T`. The inner item is never
+        // dropped until `self` is dropped: it is never replaced.
         unsafe {
             self.with_map_ref(|map| {
-                map.get(&TypeId::of::<T>()).map(|ptr| ptr.deanonymize())
+                map.get(&TypeId::of::<T>()).and_then(|ptr| ptr.deanonymize())
             })
         }
     }
@@ -617,7 +629,7 @@ impl<K: kind::Kind> Container<K> {
     /// ```
     #[inline(always)]
     pub fn freeze(&mut self) {
-        self.frozen.store(true, Ordering::SeqCst);
+        self.frozen = true;
     }
 
     /// Returns `true` if the container is frozen and `false` otherwise.
@@ -636,7 +648,7 @@ impl<K: kind::Kind> Container<K> {
     /// ```
     #[inline(always)]
     pub fn is_frozen(&self) -> bool {
-        self.frozen.load(Ordering::Relaxed)
+        self.frozen
     }
 
     /// Returns the number of distinctly typed values in the containers.
@@ -663,17 +675,11 @@ impl<K: kind::Kind> Container<K> {
         unsafe { self.with_map_ref(|map| map.len()) }
     }
 
-    // Initializes the `map` if needed.
-    unsafe fn init_map_if_needed(&self) {
-        if self.init.needed() {
-            *self.map.get() = Some(HashMap::<_, _, _>::default());
-            self.init.mark_complete();
-        }
-    }
-
     #[inline(always)]
     fn lock(&self) {
-        while self.mutex.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Relaxed).is_err() {}
+        while self.mutex.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Relaxed).is_err() {
+            yield_now()
+        }
     }
 
     #[inline(always)]

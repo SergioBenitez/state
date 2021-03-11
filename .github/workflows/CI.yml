@@ -4,26 +4,20 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: "${{ matrix.os.name }} ${{ matrix.test.name }}"
+    name: "${{ matrix.platform.name }} ${{ matrix.test.name }} (${{ matrix.platform.toolchain }})"
 
     strategy:
       matrix:
-        os:
-          - name: Linux
-            distro: ubuntu-latest
-          - name: Windows
-            distro: windows-latest
-          - name: macOS
-            distro: macOS-latest
+        platform:
+          - { name: Linux, distro: ubuntu-latest, toolchain: stable }
+          - { name: Windows, distro: windows-latest, toolchain: stable }
+          - { name: macOS, distro: macOS-latest, toolchain: stable }
+          - { name: Linux, distro: ubuntu-latest, toolchain: nightly }
         test:
-          - name: Stable
-            toolchain: stable
-            flag:
-          - name: Stable (--all-features)
-            toolchain: stable
-            flag: "--all-features"
+          - { name: Default }
+          - { name: Featured, args: "--all-features" }
 
-    runs-on: ${{ matrix.os.distro }}
+    runs-on: ${{ matrix.platform.distro }}
 
     steps:
       - name: Checkout Sources
@@ -33,11 +27,56 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.test.toolchain }}
+          toolchain: ${{ matrix.platform.toolchain }}
           override: true
 
       - name: Run Tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: ${{ matrix.test.flag }}
+          args: ${{ matrix.test.args }}
+
+  loom-verify:
+    name: Loom Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      - name: Run Loom Verification
+        uses: actions-rs/cargo@v1
+        env:
+          RUSTFLAGS: --cfg loom --cfg loom_nightly
+        with:
+          command: test
+          args: --release --test loom
+
+  miri-verify:
+    name: Miri Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Install Rust w/Miri
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: miri
+          override: true
+
+      - name: Run Miri Verification
+        uses: actions-rs/cargo@v1
+        env:
+          MIRIFLAGS: -Zmiri-track-raw-pointers
+        with:
+          command: miri
+          args: test

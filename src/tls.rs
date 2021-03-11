@@ -1,15 +1,17 @@
 use std::fmt;
 
-use thread_local::ThreadLocal;
-use storage::Storage;
+use crate::thread_local::ThreadLocal;
+use crate::storage::Storage;
 
 pub struct LocalValue<T> {
     tls: ThreadLocal<T>,
-    init_fn: Box<dyn Fn() -> T>,
+    init_fn: Box<dyn Fn() -> T + Send + Sync>,
 }
 
 impl<T: Send + 'static> LocalValue<T> {
-    pub fn new<F: Fn() -> T + 'static>(init_fn: F) -> LocalValue<T> {
+    pub fn new<F: Fn() -> T>(init_fn: F) -> LocalValue<T>
+        where F: Send + Sync + 'static
+    {
         LocalValue {
             tls: ThreadLocal::new(),
             init_fn: Box::new(init_fn),
@@ -20,10 +22,6 @@ impl<T: Send + 'static> LocalValue<T> {
         self.tls.get_or(|| (self.init_fn)())
     }
 }
-
-unsafe impl<T: Send + 'static> Sync for LocalValue<T> {}
-
-unsafe impl<T: Send + 'static> Send for LocalValue<T> {}
 
 /// A single storage location for global access to thread-local values.
 ///
@@ -148,7 +146,9 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// assert_eq!(MY_GLOBAL.set(|| "Goodbye, world!"), false);
     /// ```
     #[inline]
-    pub fn set<F: Fn() -> T + 'static>(&self, state_init: F) -> bool {
+    pub fn set<F: Fn() -> T>(&self, state_init: F) -> bool
+        where F: Send + Sync + 'static
+    {
         self.storage.set(LocalValue::new(state_init))
     }
 
@@ -202,9 +202,8 @@ impl<T: Send + 'static> LocalStorage<T> {
     }
 }
 
-unsafe impl<T: Send + 'static> Send for LocalStorage<T> {  }
-
-unsafe impl<T: Send + 'static> Sync for LocalStorage<T> {  }
+#[cfg(test)] static_assertions::assert_impl_all!(LocalValue<u8>: Send, Sync);
+#[cfg(test)] static_assertions::assert_impl_all!(LocalStorage<u8>: Send, Sync);
 
 impl<T: fmt::Debug + Send + 'static> fmt::Debug for LocalStorage<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
