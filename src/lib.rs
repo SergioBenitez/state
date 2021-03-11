@@ -8,7 +8,7 @@
 //!
 //!  * **[`struct@Container`]:** Type-based storage for many values.
 //!  * **[`Storage`]:** Lazy storage for a single value.
-//!  * **[`LocalStorage`]:** Thread-local storage for a single value.
+//!  * **[`LocalStorage`]:** Lazy thread-local storage for a single value.
 //!
 //! ## Usage
 //!
@@ -214,6 +214,14 @@
 //!     assert_eq!(total, 10);
 //! }
 //! ```
+//! ## Correctness
+//!
+//! `state` has been extensively vetted, manually and automatically, for soundness
+//! and correctness. _All_ unsafe code, including in internal concurrency
+//! primitives, `Container`, and `Storage` are exhaustively verified for pairwise
+//! concurrency correctness and internal aliasing exclusion with `loom`.
+//! Multithreading invariants, aliasing invariants, and other soundness properties
+//! are verified with `miri`. Verification is run by the CI on every commit.
 //!
 //! ## Performance
 //!
@@ -226,16 +234,16 @@
 //! synchronization overhead, so retrieval from `LocalStorage` is faster than
 //! through `Storage` across many threads.
 //!
-//! Keep in mind that `state` allows global initialization at _any_ point in the
+//! Bear in mind that `state` allows global initialization at _any_ point in the
 //! program. Other solutions, such as `lazy_static!` and `thread_local!` allow
 //! initialization _only_ a priori. In other words, `state`'s abilities are a
-//! superset of those provided by `lazy_static!` and `thread_local!`.
+//! superset of those provided by `lazy_static!` and `thread_local!` while being
+//! more performant.
 //!
 //! ## When To Use
 //!
 //! You should avoid using `state` as much as possible. Instead, thread state
 //! manually throughout your program when feasible.
-//!
 
 #[macro_use]
 #[cfg(feature = "tls")]
