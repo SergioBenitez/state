@@ -688,6 +688,24 @@ impl<K: kind::Kind> Container<K> {
     }
 }
 
+impl Default for Container![Send + Sync] {
+    fn default() -> Self {
+        <Container![Send + Sync]>::new()
+    }
+}
+
+impl Default for Container![Send] {
+    fn default() -> Self {
+        <Container![Send]>::new()
+    }
+}
+
+impl Default for Container![] {
+    fn default() -> Self {
+        <Container![]>::new()
+    }
+}
+
 impl<K: kind::Kind> std::fmt::Debug for Container<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Container")
