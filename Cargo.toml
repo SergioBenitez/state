@@ -34,4 +34,4 @@ lto = true
 all-features = true
 
 [target.'cfg(loom)'.dependencies]
-loom = { version = "0.3", features = ["checkpoint"] }
+loom = { version = "0.5", features = ["checkpoint"] }
