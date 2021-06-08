@@ -34,7 +34,7 @@ Include `state` in your `Cargo.toml` `[dependencies]`:
 
 ```toml
 [dependencies]
-state = "0.4"
+state = "0.5"
 ```
 
 Thread-local state management is not enabled by default. You can enable it
@@ -42,7 +42,7 @@ via the `tls` feature:
 
 ```toml
 [dependencies]
-state = { version = "0.4", features = ["tls"] }
+state = { version = "0.5", features = ["tls"] }
 ```
 
 ## Correctness
