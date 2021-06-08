@@ -13,10 +13,9 @@ license = "MIT/Apache-2.0"
 edition = "2018"
 
 [features]
-tls = ["lazy_static"]
+tls = []
 
 [dependencies]
-lazy_static = { version = "1", optional = true }
 
 [dev-dependencies]
 static_assertions = "1.1.0"

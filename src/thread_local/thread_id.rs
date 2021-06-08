@@ -6,8 +6,10 @@
 // copied, modified, or distributed except according to those terms.
 
 use std::collections::BinaryHeap;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use std::usize;
+
+use crate::Storage;
 
 // Thread ID manager which allocates thread IDs. It attempts to aggressively
 // reuse thread IDs where possible to avoid cases where a ThreadLocal grows
@@ -36,8 +38,12 @@ impl ThreadIdManager {
         self.free_list.push(id);
     }
 }
-lazy_static! {
-    static ref THREAD_ID_MANAGER: Mutex<ThreadIdManager> = Mutex::new(ThreadIdManager::new());
+
+
+fn thread_id_manager() -> MutexGuard<'static, ThreadIdManager> {
+    static THREAD_ID_MANAGER: Storage<Mutex<ThreadIdManager>> = Storage::new();
+
+    THREAD_ID_MANAGER.get_or_set(|| Mutex::new(ThreadIdManager::new())).lock().unwrap()
 }
 
 // Non-zero integer which is unique to the current thread while it is running.
@@ -45,12 +51,12 @@ lazy_static! {
 struct ThreadId(usize);
 impl ThreadId {
     fn new() -> ThreadId {
-        ThreadId(THREAD_ID_MANAGER.lock().unwrap().alloc())
+        ThreadId(thread_id_manager().alloc())
     }
 }
 impl Drop for ThreadId {
     fn drop(&mut self) {
-        THREAD_ID_MANAGER.lock().unwrap().free(self.0);
+        thread_id_manager().free(self.0)
     }
 }
 thread_local!(static THREAD_ID: ThreadId = ThreadId::new());

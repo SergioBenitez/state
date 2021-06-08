@@ -245,10 +245,6 @@
 //! You should avoid using `state` as much as possible. Instead, thread state
 //! manually throughout your program when feasible.
 
-#[macro_use]
-#[cfg(feature = "tls")]
-extern crate lazy_static;
-
 mod ident_hash;
 #[doc(hidden)] pub mod container;
 mod storage;
