@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/state/0.5.0")]
+#![doc(html_root_url = "https://docs.rs/state/0.5.1")]
 #![warn(missing_docs)]
 
 //! # Safe, Effortless `state` Management
