@@ -20,6 +20,9 @@ tls = []
 [dev-dependencies]
 static_assertions = "1.1.0"
 
+[target.'cfg(loom)'.dependencies]
+loom = { version = "0.5", features = ["checkpoint"] }
+
 [profile.release]
 opt-level = 3
 lto = true
@@ -30,6 +33,3 @@ lto = true
 
 [package.metadata.docs.rs]
 all-features = true
-
-[target.'cfg(loom)'.dependencies]
-loom = { version = "0.5", features = ["checkpoint"] }

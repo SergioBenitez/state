@@ -242,21 +242,23 @@
 //!
 //! ## When To Use
 //!
-//! You should avoid using `state` as much as possible. Instead, thread state
-//! manually throughout your program when feasible.
+//! You should avoid using global `state` as much as possible. Instead, thread
+//! state manually throughout your program when feasible.
 
 mod ident_hash;
-#[doc(hidden)] pub mod container;
 mod storage;
 mod init;
-#[cfg(feature = "tls")] mod thread_local;
-#[cfg(feature = "tls")] mod tls;
-
 mod shim;
-pub(crate) use shim::*;
+
+#[doc(hidden)]
+pub mod container;
 
 pub use container::Container;
 pub use storage::Storage;
+pub(crate) use shim::*;
+
+#[cfg(feature = "tls")] mod tls;
+#[cfg(feature = "tls")] mod thread_local;
 #[cfg(feature = "tls")] pub use tls::LocalStorage;
 
 /// Exports for use by loom tests but otherwise private.
