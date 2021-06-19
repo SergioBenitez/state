@@ -45,6 +45,10 @@ via the `tls` feature:
 state = { version = "0.5", features = ["tls"] }
 ```
 
+## MSRV
+
+The minimum supported Rust version is `1.32.0` as of `state` version `0.5.2`.
+
 ## Correctness
 
 `state` has been extensively vetted, manually and automatically, for soundness
