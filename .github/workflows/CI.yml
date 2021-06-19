@@ -9,6 +9,7 @@ jobs:
     strategy:
       matrix:
         platform:
+          - { name: Linux, distro: ubuntu-latest, toolchain: "1.32.0" }
           - { name: Linux, distro: ubuntu-latest, toolchain: stable }
           - { name: Windows, distro: windows-latest, toolchain: stable }
           - { name: macOS, distro: macOS-latest, toolchain: stable }
