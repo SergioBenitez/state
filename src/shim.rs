@@ -38,7 +38,9 @@ pub mod cell {
         #[inline(always)]
         #[cfg_attr(loom_nightly, track_caller)]
         pub fn get_mut(&mut self) -> &mut T {
-            #[cfg(not(loom))] { self.0.get_mut() }
+            // SAFETY: This is the fully safe `UnsafeCell::get_mut()` introduced
+            // in Rust 1.50.0. We don't use it to keep the MSRV down.
+            #[cfg(not(loom))] unsafe { &mut *self.0.get() }
             #[cfg(loom)] { self.with_mut(|ptr| unsafe { &mut *ptr }) }
         }
 
