@@ -79,6 +79,13 @@ impl<T> Storage<T> {
     }
 }
 
+/// Defaults to [`Storage::new()`].
+impl<T> Default for Storage<T> {
+    fn default() -> Self {
+        Storage::new()
+    }
+}
+
 impl<T: Send + Sync> Storage<T> {
     /// Sets the value for this storage unit to `value` if it has not already
     /// been set before.
