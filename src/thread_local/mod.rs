@@ -134,8 +134,8 @@ impl<T: Send> ThreadLocal<T> {
 
     /// Returns the element for the current thread, if it exists.
     pub fn get(&self) -> Option<&T> {
-        let id = thread_id::get();
-        self.get_fast(id)
+        thread_id::get()
+            .and_then(|id| self.get_fast(id))
     }
 
     /// Returns the element for the current thread, or creates it if it doesn't
@@ -146,6 +146,7 @@ impl<T: Send> ThreadLocal<T> {
     {
         unsafe {
             self.get_or_try(|| Ok::<T, ()>(create()))
+                .unwrap()
                 .unchecked_unwrap_ok()
         }
     }
@@ -153,15 +154,20 @@ impl<T: Send> ThreadLocal<T> {
     /// Returns the element for the current thread, or creates it if it doesn't
     /// exist. If `create` fails, that error is returned and no element is
     /// added.
-    pub fn get_or_try<F, E>(&self, create: F) -> Result<&T, E>
+    pub fn get_or_try<F, E>(&self, create: F) -> Option<Result<&T, E>>
     where
         F: FnOnce() -> Result<T, E>,
     {
-        let id = thread_id::get();
-        match self.get_fast(id) {
-            Some(x) => Ok(x),
-            None => Ok(self.insert(id, Box::new(create()?), true)),
-        }
+        thread_id::get().and_then(|id|
+            match self.get_fast(id) {
+                Some(x) => Some(Ok(x)),
+                None => Some(
+                    create().and_then(|obj|
+                        Ok(self.insert(id, Box::new(obj), true))
+                    )
+                ),
+            }
+        )
     }
 
     // Simple hash table lookup function

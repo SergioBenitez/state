@@ -21,6 +21,11 @@ impl<T: Send + 'static> LocalValue<T> {
     pub fn get(&self) -> &T {
         self.tls.get_or(|| (self.init_fn)())
     }
+
+    pub fn try_get(&self) -> Option<&T> {
+        self.tls.get_or_try(|| Ok::<T, ()>((self.init_fn)()))
+            .and_then(|res| res.ok())
+    }
 }
 
 /// A single storage location for global access to thread-local values.
@@ -174,7 +179,7 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// ```
     #[inline]
     pub fn try_get(&self) -> Option<&T> {
-        self.storage.try_get().map(|v| v.get())
+        self.storage.try_get().and_then(|v| v.try_get())
     }
 
     /// If this is the first time a thread with the current thread ID has called
