@@ -62,6 +62,6 @@ impl Drop for ThreadId {
 thread_local!(static THREAD_ID: ThreadId = ThreadId::new());
 
 /// Returns a non-zero ID for the current thread
-pub fn get() -> usize {
-    THREAD_ID.with(|x| x.0)
+pub fn get() -> Option<usize> {
+    THREAD_ID.try_with(|x| x.0).ok()
 }

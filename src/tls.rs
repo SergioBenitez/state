@@ -21,6 +21,11 @@ impl<T: Send + 'static> LocalValue<T> {
     pub fn get(&self) -> &T {
         self.tls.get_or(|| (self.init_fn)())
     }
+
+    pub fn try_get(&self) -> Option<&T> {
+        self.tls.get_or_try(|| Ok::<T, ()>((self.init_fn)()))
+            .and_then(|res| res.ok())
+    }
 }
 
 /// A thread-local init-once-per-thread cell for thread-local values.
@@ -174,7 +179,7 @@ impl<T: Send + 'static> LocalInitCell<T> {
     /// ```
     #[inline]
     pub fn try_get(&self) -> Option<&T> {
-        self.cell.try_get().map(|v| v.get())
+        self.cell.try_get().and_then(|v| v.try_get())
     }
 
     /// If this is the first time a thread with the current thread ID has called
