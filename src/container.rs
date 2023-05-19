@@ -145,7 +145,8 @@ pub struct Container<K: kind::Kind> {
     map: UnsafeCell<Option<TypeMap>>,
     mutex: AtomicUsize,
     frozen: bool,
-    _kind: PhantomData<K>
+    /// Force !Send (and carry the type).
+    _kind: PhantomData<*mut K>
 }
 
 mod kind {
