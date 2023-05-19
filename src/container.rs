@@ -208,7 +208,7 @@ impl AnyObject {
 
     fn deanonymize<T: 'static>(&self) -> Option<&T> {
         unsafe {
-            let any: *const *const dyn Any = std::mem::transmute(self);
+            let any: *const *const dyn Any = self as *const Self as *const *const dyn Any;
             let any: &dyn Any = &*(*any as *const dyn Any);
             any.downcast_ref()
         }
@@ -218,10 +218,10 @@ impl AnyObject {
 impl Drop for AnyObject {
     fn drop(&mut self) {
         unsafe {
-            let any: *mut *mut dyn Any = std::mem::transmute(self);
+            let any: *mut *mut dyn Any = self as *mut Self as *mut *mut dyn Any;
             let any: *mut dyn Any = *any;
             let any: Box<dyn Any> = Box::from_raw(any);
-            drop(any)
+            drop(any);
         }
     }
 }
@@ -487,6 +487,7 @@ impl<K: kind::Kind> Container<K> {
     // SAFETY: Caller must ensure mutual exclusion of calls to this function
     // and/or calls to `map_ref`.
     #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
     unsafe fn map_mut(&self) -> &mut TypeMap {
         self.init_map_if_needed();
         self.map.with_mut(|ptr| (*ptr).as_mut().unwrap())
@@ -580,8 +581,8 @@ impl<K: kind::Kind> Container<K> {
     /// # Panics
     ///
     /// Panics if the state for type `T` has not previously been
-    /// [set](#method.set). Use [try_get](#method.try_get) for a non-panicking
-    /// version.
+    /// [`set()`](Self::set()). Use [`try_get()`](Self::try_get()) for a
+    /// non-panicking version.
     ///
     /// # Example
     ///
@@ -671,15 +672,34 @@ impl<K: kind::Kind> Container<K> {
     /// assert_eq!(container.set(1u8), true);
     /// assert_eq!(container.len(), 2);
     /// ```
+    #[inline]
     pub fn len(&self) -> usize {
         // SAFETY: We retrieve a `usize`, which is clearly stable.
         unsafe { self.with_map_ref(|map| map.len()) }
     }
 
+    /// Returns `true` if the container holds zero values.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use state::Container;
+    ///
+    /// let container = <Container![Send + Sync]>::new();
+    /// assert!(container.is_empty());
+    ///
+    /// assert_eq!(container.set(1usize), true);
+    /// assert!(!container.is_empty());
+    /// ```
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     #[inline(always)]
     fn lock(&self) {
         while self.mutex.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Relaxed).is_err() {
-            yield_now()
+            yield_now();
         }
     }
 

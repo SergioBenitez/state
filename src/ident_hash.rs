@@ -4,6 +4,7 @@ use std::hash::Hasher;
 // hash is meant to be used _only_ for "prehashed" values. In particular, we use
 // this so that hashing a TypeId is essentially a noop. This is because TypeIds
 // are already unique u64s.
+#[derive(Default)]
 pub struct IdentHash(u64);
 
 impl Hasher for IdentHash {
@@ -23,11 +24,5 @@ impl Hasher for IdentHash {
 
     fn write_u64(&mut self, i: u64) {
         self.0 = i;
-    }
-}
-
-impl Default for IdentHash {
-    fn default() -> IdentHash {
-        IdentHash(0)
     }
 }

@@ -7,10 +7,10 @@ use crate::init::Init;
 ///
 /// A `Storage` instance can hold a single value in a global context. A
 /// `Storage` instance begins without a value and must be initialized via the
-/// [set](#method.set) method. Once a value has been set, it can be retrieved at
-/// any time and in any thread via the [get](#method.get) method. The
-/// [try_get](#method.try_get) can be used to determine whether the `Storage`
-/// has been initialized before attempting to retrieve the value.
+/// [`set()`](#method.set) method. Once a value has been set, it can be
+/// retrieved at any time and in any thread via the [`get()`](#method.get)
+/// method. The [`try_get()`](#method.try_get) can be used to determine whether
+/// the `Storage` has been initialized before attempting to retrieve the value.
 ///
 /// For safety reasons, values stored in `Storage` must be `Send + Sync`.
 ///
@@ -235,9 +235,7 @@ impl<T: Send + Sync> Storage<T> {
     /// assert_eq!(storage.get(), &15);
     /// ```
     pub fn map<U: Send + Sync, F: FnOnce(T) -> U>(self, f: F) -> Storage<U> {
-        self.into_inner()
-            .map(|v| Storage::from(f(v)))
-            .unwrap_or_else(|| Storage::new())
+        self.into_inner().map_or_else(|| Storage::new(), |v| Storage::from(f(v)))
     }
 }
 
