@@ -9,7 +9,7 @@ use std::collections::BinaryHeap;
 use std::sync::{Mutex, MutexGuard};
 use std::usize;
 
-use crate::Storage;
+use crate::InitCell;
 
 // Thread ID manager which allocates thread IDs. It attempts to aggressively
 // reuse thread IDs where possible to avoid cases where a ThreadLocal grows
@@ -41,7 +41,7 @@ impl ThreadIdManager {
 
 
 fn thread_id_manager() -> MutexGuard<'static, ThreadIdManager> {
-    static THREAD_ID_MANAGER: Storage<Mutex<ThreadIdManager>> = Storage::new();
+    static THREAD_ID_MANAGER: InitCell<Mutex<ThreadIdManager>> = InitCell::new();
 
     THREAD_ID_MANAGER.get_or_set(|| Mutex::new(ThreadIdManager::new())).lock().unwrap()
 }

@@ -12,7 +12,7 @@ A Rust library for safe and effortless global and thread-local state management.
 ```rust
 extern crate state;
 
-static GLOBAL: state::Storage<u32> = state::Storage::new();
+static GLOBAL: state::InitCell<u32> = state::InitCell::new();
 
 GLOBAL.set(42);
 assert_eq!(*GLOBAL.get(), 42);
@@ -53,19 +53,19 @@ The minimum supported Rust version is `1.32.0` as of `state` version `0.5.2`.
 
 `state` has been extensively vetted, manually and automatically, for soundness
 and correctness. _All_ unsafe code, including in internal concurrency
-primitives, `Container`, and `Storage` are exhaustively verified for pairwise
+primitives, `Container`, and `InitCell` are exhaustively verified for pairwise
 concurrency correctness and internal aliasing exclusion with `loom`.
 Multithreading invariants, aliasing invariants, and other soundness properties
 are verified with `miri`. Verification is run by the CI on every commit.
 
 ## Performance
 
-`state` is heavily tuned to perform optimally. `Storage` is optimal for global
+`state` is heavily tuned to perform optimally. `InitCell` is optimal for global
 storage retrieval; it is _slightly faster_ than accessing global state
-initialized through `lazy_static!`, more so across many threads. `LocalStorage`
-incurs slight overhead due to thread lookup. However, `LocalStorage` has no
-synchronization overhead, so retrieval from `LocalStorage` is faster than
-through `Storage` across many threads.
+initialized through `lazy_static!`, more so across many threads. `LocalInitCell`
+incurs slight overhead due to thread lookup. However, `LocalInitCell` has no
+synchronization overhead, so retrieval from `LocalInitCell` is faster than
+through `InitCell` across many threads.
 
 Bear in mind that `state` allows global initialization at _any_ point in the
 program. Other solutions, such as `lazy_static!` and `thread_local!` allow

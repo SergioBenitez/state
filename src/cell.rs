@@ -1,22 +1,22 @@
 use std::fmt;
 
-use crate::cell::UnsafeCell;
+use crate::shim::cell::UnsafeCell;
 use crate::init::Init;
 
-/// A single storage location for global access to a value.
+/// An init-once cell for global access to a value.
 ///
-/// A `Storage` instance can hold a single value in a global context. A
-/// `Storage` instance begins without a value and must be initialized via the
+/// A `InitCell` instance can hold a single value in a global context. A
+/// `InitCell` instance begins without a value and must be initialized via the
 /// [`set()`](#method.set) method. Once a value has been set, it can be
 /// retrieved at any time and in any thread via the [`get()`](#method.get)
 /// method. The [`try_get()`](#method.try_get) can be used to determine whether
-/// the `Storage` has been initialized before attempting to retrieve the value.
+/// the `InitCell` has been initialized before attempting to retrieve the value.
 ///
-/// For safety reasons, values stored in `Storage` must be `Send + Sync`.
+/// For safety reasons, values stored in `InitCell` must be `Send + Sync`.
 ///
 /// # Example
 ///
-/// The following example uses `Storage` to hold a global instance of a
+/// The following example uses `InitCell` to hold a global instance of a
 /// `HashMap` which can be modified at will:
 ///
 /// ```rust
@@ -24,9 +24,9 @@ use crate::init::Init;
 /// use std::sync::Mutex;
 /// use std::thread;
 ///
-/// use state::Storage;
+/// use state::InitCell;
 ///
-/// static GLOBAL_MAP: Storage<Mutex<HashMap<String, String>>> = Storage::new();
+/// static GLOBAL_MAP: InitCell<Mutex<HashMap<String, String>>> = InitCell::new();
 ///
 /// fn run_program() {
 ///     let mut map = GLOBAL_MAP.get().lock().unwrap();
@@ -46,24 +46,24 @@ use crate::init::Init;
 ///     let map = GLOBAL_MAP.get().lock().unwrap();
 ///     assert_eq!(map.get("another_key").unwrap(), "another_value");
 /// }
-pub struct Storage<T> {
+pub struct InitCell<T> {
     item: UnsafeCell<Option<T>>,
     init: Init
 }
 
-impl<T> Storage<T> {
-    /// Create a new, uninitialized storage location.
+impl<T> InitCell<T> {
+    /// Create a new, uninitialized cell.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use state::Storage;
+    /// use state::InitCell;
     ///
-    /// static MY_GLOBAL: Storage<String> = Storage::new();
+    /// static MY_GLOBAL: InitCell<String> = InitCell::new();
     /// ```
     #[cfg(not(loom))]
-    pub const fn new() -> Storage<T> {
-        Storage {
+    pub const fn new() -> InitCell<T> {
+        InitCell {
             item: UnsafeCell::new(None),
             init: Init::new()
         }
@@ -71,23 +71,23 @@ impl<T> Storage<T> {
 
     /// New, for loom.
     #[cfg(loom)]
-    pub fn new() -> Storage<T> {
-        Storage {
+    pub fn new() -> InitCell<T> {
+        InitCell {
             item: UnsafeCell::new(None),
             init: Init::new()
         }
     }
 }
 
-/// Defaults to [`Storage::new()`].
-impl<T> Default for Storage<T> {
+/// Defaults to [`InitCell::new()`].
+impl<T> Default for InitCell<T> {
     fn default() -> Self {
-        Storage::new()
+        InitCell::new()
     }
 }
 
-impl<T: Send + Sync> Storage<T> {
-    /// Sets the value for this storage unit to `value` if it has not already
+impl<T: Send + Sync> InitCell<T> {
+    /// Sets the value for this cell to `value` if it has not already
     /// been set before.
     ///
     /// If a value has previously been set, `self` is unchanged and `false` is
@@ -96,8 +96,8 @@ impl<T: Send + Sync> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # use state::Storage;
-    /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
+    /// # use state::InitCell;
+    /// static MY_GLOBAL: InitCell<&'static str> = InitCell::new();
     ///
     /// assert_eq!(MY_GLOBAL.set("Hello, world!"), true);
     /// assert_eq!(MY_GLOBAL.set("Goodbye, world!"), false);
@@ -112,7 +112,7 @@ impl<T: Send + Sync> Storage<T> {
         false
     }
 
-    /// Attempts to borrow the value in this storage location.
+    /// Attempts to borrow the value in this cell.
     ///
     /// Returns `Some` if the state has previously been [set](#method.set).
     /// Otherwise returns `None`.
@@ -120,8 +120,8 @@ impl<T: Send + Sync> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # use state::Storage;
-    /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
+    /// # use state::InitCell;
+    /// static MY_GLOBAL: InitCell<&'static str> = InitCell::new();
     ///
     /// assert_eq!(MY_GLOBAL.try_get(), None);
     ///
@@ -140,7 +140,7 @@ impl<T: Send + Sync> Storage<T> {
         }
     }
 
-    /// Borrows the value in this storage location.
+    /// Borrows the value in this cell.
     ///
     /// # Panics
     ///
@@ -150,8 +150,8 @@ impl<T: Send + Sync> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # use state::Storage;
-    /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
+    /// # use state::InitCell;
+    /// static MY_GLOBAL: InitCell<&'static str> = InitCell::new();
     ///
     /// MY_GLOBAL.set("Hello, world!");
     /// assert_eq!(*MY_GLOBAL.get(), "Hello, world!");
@@ -159,17 +159,17 @@ impl<T: Send + Sync> Storage<T> {
     #[inline]
     pub fn get(&self) -> &T {
         self.try_get()
-            .expect("storage::get(): called get() before set()")
+            .expect("cell::get(): called get() before set()")
     }
 
-    /// If the storage location has not yet been set, it is set to the return
-    /// value of `from`. Returns a borrow to the value in this storage location.
+    /// If the cell has not yet been set, it is set to the return
+    /// value of `from`. Returns a borrow to the value in this cell.
     ///
     /// # Example
     ///
     /// ```rust
-    /// # use state::Storage;
-    /// static MY_GLOBAL: Storage<&'static str> = Storage::new();
+    /// # use state::InitCell;
+    /// static MY_GLOBAL: InitCell<&'static str> = InitCell::new();
     ///
     /// assert_eq!(*MY_GLOBAL.get_or_set(|| "Hello, world!"), "Hello, world!");
     /// ```
@@ -185,19 +185,19 @@ impl<T: Send + Sync> Storage<T> {
 
     /// Returns a mutable reference to the underlying data if any is set.
     ///
-    /// This call borrows `Storage` mutably (at compile-time) so there is no
+    /// This call borrows `InitCell` mutably (at compile-time) so there is no
     /// need for dynamic checks.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use state::Storage;
+    /// use state::InitCell;
     ///
-    /// let mut storage = Storage::from(5);
-    /// *storage.try_get_mut().unwrap() += 1;
+    /// let mut cell = InitCell::from(5);
+    /// *cell.try_get_mut().unwrap() += 1;
     ///
-    /// let mut storage: Storage<usize> = Storage::new();
-    /// assert!(storage.try_get_mut().is_none());
+    /// let mut cell: InitCell<usize> = InitCell::new();
+    /// assert!(cell.try_get_mut().is_none());
     /// ```
     pub fn try_get_mut(&mut self) -> Option<&mut T> {
         self.item.get_mut().as_mut()
@@ -208,63 +208,63 @@ impl<T: Send + Sync> Storage<T> {
     /// # Example
     ///
     /// ```rust
-    /// use state::Storage;
+    /// use state::InitCell;
     ///
-    /// let storage = Storage::from(5);
-    /// assert_eq!(storage.into_inner().unwrap(), 5);
+    /// let cell = InitCell::from(5);
+    /// assert_eq!(cell.into_inner().unwrap(), 5);
     ///
-    /// let storage: Storage<usize> = Storage::new();
-    /// assert!(storage.into_inner().is_none());
+    /// let cell: InitCell<usize> = InitCell::new();
+    /// assert!(cell.into_inner().is_none());
     /// ```
     pub fn into_inner(self) -> Option<T> {
         self.item.into_inner()
     }
 
     /// Applies the function `f` to the inner value, if there is any, and
-    /// returns a new `Storage` with mapped value.
+    /// returns a new `InitCell` with mapped value.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use state::Storage;
+    /// use state::InitCell;
     ///
-    /// let storage = Storage::from(5);
-    /// assert_eq!(storage.get(), &5);
+    /// let cell = InitCell::from(5);
+    /// assert_eq!(cell.get(), &5);
     ///
-    /// let storage = storage.map(|v| v + 10);
-    /// assert_eq!(storage.get(), &15);
+    /// let cell = cell.map(|v| v + 10);
+    /// assert_eq!(cell.get(), &15);
     /// ```
-    pub fn map<U: Send + Sync, F: FnOnce(T) -> U>(self, f: F) -> Storage<U> {
-        self.into_inner().map_or_else(|| Storage::new(), |v| Storage::from(f(v)))
+    pub fn map<U: Send + Sync, F: FnOnce(T) -> U>(self, f: F) -> InitCell<U> {
+        self.into_inner().map_or_else(|| InitCell::new(), |v| InitCell::from(f(v)))
     }
 }
 
-unsafe impl<T: Send + Sync> Sync for Storage<T> {  }
+unsafe impl<T: Send + Sync> Sync for InitCell<T> {  }
 
-unsafe impl<T: Send + Sync> Send for Storage<T> {  }
+unsafe impl<T: Send + Sync> Send for InitCell<T> {  }
 
-impl<T: fmt::Debug + Send + Sync> fmt::Debug for Storage<T> {
+impl<T: fmt::Debug + Send + Sync> fmt::Debug for InitCell<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self.try_get() {
             Some(object) => object.fmt(f),
-            None => write!(f, "[uninitialized storage]")
+            None => write!(f, "[uninitialized cell]")
         }
     }
 }
 
-impl<T: Send + Sync> From<T> for Storage<T> {
-    fn from(value: T) -> Storage<T> {
-        let storage = Storage::new();
-        assert!(storage.set(value));
-        storage
+impl<T: Send + Sync> From<T> for InitCell<T> {
+    fn from(value: T) -> InitCell<T> {
+        let cell = InitCell::new();
+        assert!(cell.set(value));
+        cell
     }
 }
 
-impl<T: Clone + Send + Sync> Clone for Storage<T> {
-    fn clone(&self) -> Storage<T> {
+impl<T: Clone + Send + Sync> Clone for InitCell<T> {
+    fn clone(&self) -> InitCell<T> {
         match self.try_get() {
-            Some(val) => Storage::from(val.clone()),
-            None => Storage::new()
+            Some(val) => InitCell::from(val.clone()),
+            None => InitCell::new()
         }
     }
 }

@@ -7,8 +7,8 @@
 //! thread-local state. Three primitives are provided for state management:
 //!
 //!  * **[`struct@Container`]:** Type-based storage for many values.
-//!  * **[`Storage`]:** Lazy storage for a single value.
-//!  * **[`LocalStorage`]:** Lazy thread-local storage for a single value.
+//!  * **[`InitCell`]:** Thread-safe init-once storage for a single value.
+//!  * **[`LocalInitCell`]:** Thread-local init-once-per-thread cell.
 //!
 //! ## Usage
 //!
@@ -31,27 +31,27 @@
 //!
 //! ### Memoizing Expensive Operations
 //!
-//! The [`Storage`] type can be used to conveniently memoize expensive
+//! The [`InitCell`] type can be used to conveniently memoize expensive
 //! read-based operations without needing to mutably borrow. Consider a `struct`
 //! with a field `value` and method `compute()` that performs an expensive
-//! operation on `value` to produce a derived value. We can use `Storage` to
+//! operation on `value` to produce a derived value. We can use `InitCell` to
 //! memoize `compute()`:
 //!
 //! ```rust
-//! use state::Storage;
+//! use state::InitCell;
 //!
 //! struct Value;
 //! struct DerivedValue;
 //!
 //! struct Foo {
 //!     value: Value,
-//!     cached: Storage<DerivedValue>
+//!     cached: InitCell<DerivedValue>
 //! }
 //!
 //! impl Foo {
 //!     fn set_value(&mut self, v: Value) {
 //!         self.value = v;
-//!         self.cached = Storage::new();
+//!         self.cached = InitCell::new();
 //!     }
 //!
 //!     fn compute(&self) -> &DerivedValue {
@@ -95,15 +95,15 @@
 //!      `RwLock<Option<Configuration>>` to `Some`. Retrieve by `lock`ing and
 //!      checking for `Some`, paying the cost of synchronization.
 //!
-//! With `state`, you can use [`LocalStorage`] as follows:
+//! With `state`, you can use [`LocalInitCell`] as follows:
 //!
 //! ```rust
 //! # extern crate state;
 //! # #[cfg(feature = "tls")]
 //! # fn main() {
-//! # use state::LocalStorage;
+//! # use state::LocalInitCell;
 //! # struct Configuration { name: String, number: isize, verbose: bool }
-//! static CONFIG: LocalStorage<Configuration> = LocalStorage::new();
+//! static CONFIG: LocalInitCell<Configuration> = LocalInitCell::new();
 //!
 //! fn main() {
 //!     CONFIG.set(|| Configuration {
@@ -121,7 +121,7 @@
 //! # fn main() {  }
 //! ```
 //!
-//! Note that you can _also_ use [`Storage`] to the same effect.
+//! Note that you can _also_ use [`InitCell`] to the same effect.
 //!
 //! ### Read/Write Singleton
 //!
@@ -130,23 +130,23 @@
 //! have two options:
 //!
 //!   1. If we want to maintain the _same_ state in any thread, we can use a
-//!      `Storage` structure and wrap our `Configuration` structure in a
+//!      `InitCell` structure and wrap our `Configuration` structure in a
 //!      synchronization primitive.
 //!   2. If we want to maintain _different_ state in any thread, we can continue
-//!      to use a `LocalStorage` structure and wrap our `LocalStorage` type in a
+//!      to use a `LocalInitCell` structure and wrap our `LocalInitCell` type in a
 //!      `Cell` structure for internal mutability.
 //!
 //! In this example, we'll choose **1**. The next example illustrates an
 //! instance of **2**.
 //!
-//! The following implements **1** by using a `Storage` structure and wrapping
+//! The following implements **1** by using a `InitCell` structure and wrapping
 //! the `Configuration` type with a `RwLock`:
 //!
 //! ```rust
 //! # struct Configuration { name: String, number: isize, verbose: bool }
-//! # use state::Storage;
+//! # use state::InitCell;
 //! # use std::sync::RwLock;
-//! static CONFIG: Storage<RwLock<Configuration>> = Storage::new();
+//! static CONFIG: InitCell<RwLock<Configuration>> = InitCell::new();
 //!
 //! fn main() {
 //!     let config = Configuration {
@@ -170,7 +170,7 @@
 //! thread. You'd like to store the count in a `Cell<usize>` and use
 //! `count.set(count.get() + 1)` to increment the count. Prior to `state`, your
 //! only option was to use the `thread_local!` macro. `state` provides a more
-//! flexible, and arguably simpler solution via `LocalStorage`. This scanario
+//! flexible, and arguably simpler solution via `LocalInitCell`. This scanario
 //! is implemented in the folloiwng:
 //!
 //! ```rust
@@ -178,9 +178,9 @@
 //! # use std::cell::Cell;
 //! # use std::thread;
 //! # #[cfg(feature = "tls")]
-//! # use state::LocalStorage;
+//! # use state::LocalInitCell;
 //! # #[cfg(feature = "tls")]
-//! static COUNT: LocalStorage<Cell<usize>> = LocalStorage::new();
+//! static COUNT: LocalInitCell<Cell<usize>> = LocalInitCell::new();
 //!
 //! # #[cfg(not(feature = "tls"))] fn function_to_measure() { }
 //! # #[cfg(feature = "tls")]
@@ -218,7 +218,7 @@
 //!
 //! `state` has been extensively vetted, manually and automatically, for soundness
 //! and correctness. _All_ unsafe code, including in internal concurrency
-//! primitives, `Container`, and `Storage` are exhaustively verified for pairwise
+//! primitives, `Container`, and `InitCell` are exhaustively verified for pairwise
 //! concurrency correctness and internal aliasing exclusion with `loom`.
 //! Multithreading invariants, aliasing invariants, and other soundness properties
 //! are verified with `miri`. Verification is run by the CI on every commit.
@@ -227,12 +227,12 @@
 //!
 //! `state` is heavily tuned to perform optimally. `get{_local}` and
 //! `set{_local}` calls to a `Container` incur overhead due to type lookup.
-//! `Storage`, on the other hand, is optimal for global storage retrieval; it is
+//! `InitCell`, on the other hand, is optimal for global storage retrieval; it is
 //! _slightly faster_ than accessing global state initialized through
-//! `lazy_static!`, more so across many threads. `LocalStorage` incurs slight
-//! overhead due to thread lookup. However, `LocalStorage` has no
-//! synchronization overhead, so retrieval from `LocalStorage` is faster than
-//! through `Storage` across many threads.
+//! `lazy_static!`, more so across many threads. `LocalInitCell` incurs slight
+//! overhead due to thread lookup. However, `LocalInitCell` has no
+//! synchronization overhead, so retrieval from `LocalInitCell` is faster than
+//! through `InitCell` across many threads.
 //!
 //! Bear in mind that `state` allows global initialization at _any_ point in the
 //! program. Other solutions, such as `lazy_static!` and `thread_local!` allow
@@ -246,7 +246,7 @@
 //! state manually throughout your program when feasible.
 
 mod ident_hash;
-mod storage;
+mod cell;
 mod init;
 mod shim;
 
@@ -254,12 +254,11 @@ mod shim;
 pub mod container;
 
 pub use container::Container;
-pub use storage::Storage;
-pub(crate) use shim::*;
+pub use cell::InitCell;
 
 #[cfg(feature = "tls")] mod tls;
 #[cfg(feature = "tls")] mod thread_local;
-#[cfg(feature = "tls")] pub use tls::LocalStorage;
+#[cfg(feature = "tls")] pub use tls::LocalInitCell;
 
 /// Exports for use by loom tests but otherwise private.
 #[cfg(loom)]

@@ -27,22 +27,22 @@ fn container_get(b: &mut Bencher) {
 }
 
 #[bench]
-fn storage_get(b: &mut Bencher) {
-    static STORAGE: state::Storage<AtomicUsize> = state::Storage::new();
+fn cell_get(b: &mut Bencher) {
+    static CELL: state::InitCell<AtomicUsize> = state::InitCell::new();
 
-    STORAGE.set(AtomicUsize::new(0));
+    CELL.set(AtomicUsize::new(0));
     b.iter(|| {
-        test::black_box(STORAGE.get().load(Ordering::Relaxed))
+        test::black_box(CELL.get().load(Ordering::Relaxed))
     });
 }
 
 #[bench]
-fn local_storage_get(b: &mut Bencher) {
-    static STORAGE: state::LocalStorage<Cell<usize>> = state::LocalStorage::new();
+fn local_cell_get(b: &mut Bencher) {
+    static CELL: state::LocalInitCell<Cell<usize>> = state::LocalInitCell::new();
 
-    STORAGE.set(|| Cell::new(0));
+    CELL.set(|| Cell::new(0));
     b.iter(|| {
-        test::black_box(STORAGE.get().get())
+        test::black_box(CELL.get().get())
     });
 }
 
@@ -134,15 +134,15 @@ fn lazy_static_get_many_threads(b: &mut Bencher) {
 }
 
 #[bench]
-fn storage_get_many_threads(b: &mut Bencher) {
-    static STORAGE: state::Storage<AtomicUsize> = state::Storage::new();
+fn cell_get_many_threads(b: &mut Bencher) {
+    static CELL: state::InitCell<AtomicUsize> = state::InitCell::new();
 
-    STORAGE.set(AtomicUsize::new(0));
+    CELL.set(AtomicUsize::new(0));
     b.iter(|| {
         let mut threads = vec![];
         for _ in 0..100 {
             threads.push(thread::spawn(|| {
-                test::black_box(STORAGE.get().load(Ordering::Relaxed))
+                test::black_box(CELL.get().load(Ordering::Relaxed))
             }));
         }
 
@@ -151,15 +151,15 @@ fn storage_get_many_threads(b: &mut Bencher) {
 }
 
 #[bench]
-fn local_storage_get_many_threads(b: &mut Bencher) {
-    static STORAGE: state::LocalStorage<Cell<usize>> = state::LocalStorage::new();
+fn local_cell_get_many_threads(b: &mut Bencher) {
+    static CELL: state::LocalInitCell<Cell<usize>> = state::LocalInitCell::new();
 
-    STORAGE.set(|| Cell::new(0));
+    CELL.set(|| Cell::new(0));
     b.iter(|| {
         let mut threads = vec![];
         for _ in 0..100 {
             threads.push(thread::spawn(|| {
-                test::black_box(STORAGE.get().get())
+                test::black_box(CELL.get().get())
             }));
         }
 

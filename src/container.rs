@@ -5,9 +5,9 @@ use std::any::{Any, TypeId};
 
 use crate::init::Init;
 use crate::ident_hash::IdentHash;
-use crate::cell::UnsafeCell;
-use crate::sync::atomic::{AtomicUsize, Ordering};
-use crate::thread::yield_now;
+use crate::shim::cell::UnsafeCell;
+use crate::shim::sync::atomic::{AtomicUsize, Ordering};
+use crate::shim::thread::yield_now;
 
 #[cfg(feature = "tls")]
 use crate::tls::LocalValue;

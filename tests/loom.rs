@@ -73,22 +73,22 @@ fn init_completed() {
 }
 
 #[test]
-fn storage() {
-    use state::Storage;
+fn cell() {
+    use state::InitCell;
 
     const THREADS: usize = 2;
 
     loom::model(|| {
-        let storage = Arc::new(Storage::<u8>::new());
+        let cell = Arc::new(InitCell::<u8>::new());
 
         let mut threads = vec![];
         for _ in 1..(THREADS + 1) {
-            let storage = storage.clone();
+            let cell = cell.clone();
             let thread = thread::spawn(move || {
-                storage.set(10);
-                assert_eq!(storage.try_get(), Some(&10));
-                assert!(!storage.set(20));
-                assert_eq!(storage.try_get(), Some(&10));
+                cell.set(10);
+                assert_eq!(cell.try_get(), Some(&10));
+                assert!(!cell.set(20));
+                assert_eq!(cell.try_get(), Some(&10));
             });
 
             threads.push(thread);

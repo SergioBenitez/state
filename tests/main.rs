@@ -203,64 +203,64 @@ mod container_tests_tls {
     }
 }
 
-mod storage_tests {
+mod cell_tests {
     use super::DroppingStruct;
-    use super::state::Storage;
+    use super::state::InitCell;
     use std::sync::{Arc, RwLock};
     use std::thread;
 
     #[test]
     fn simple_put_get() {
-        static STORAGE: Storage<u32> = Storage::new();
+        static CELL: InitCell<u32> = InitCell::new();
 
-        assert!(STORAGE.set(10));
-        assert_eq!(*STORAGE.get(), 10);
+        assert!(CELL.set(10));
+        assert_eq!(*CELL.get(), 10);
     }
 
     #[test]
     fn no_double_put() {
-        static STORAGE: Storage<u32> = Storage::new();
+        static CELL: InitCell<u32> = InitCell::new();
 
-        assert!(STORAGE.set(1));
-        assert!(!STORAGE.set(5));
-        assert_eq!(*STORAGE.get(), 1);
+        assert!(CELL.set(1));
+        assert!(!CELL.set(5));
+        assert_eq!(*CELL.get(), 1);
     }
 
     #[test]
     fn many_puts_only_one_succeeds() {
-        static STORAGE: Storage<u32> = Storage::new();
+        static CELL: InitCell<u32> = InitCell::new();
 
         let mut threads = vec![];
         for _ in 0..1000 {
             threads.push(thread::spawn(|| {
-                let was_set = STORAGE.set(10);
-                assert_eq!(*STORAGE.get(), 10);
+                let was_set = CELL.set(10);
+                assert_eq!(*CELL.get(), 10);
                 was_set
             }))
         }
 
         let results: Vec<bool> = threads.into_iter().map(|t| t.join().unwrap()).collect();
         assert_eq!(results.into_iter().filter(|&b| b).count(), 1);
-        assert_eq!(*STORAGE.get(), 10);
+        assert_eq!(*CELL.get(), 10);
     }
 
     #[test]
     fn dst_set_get() {
-        static STORAGE: Storage<[u32; 4]> = Storage::new();
+        static CELL: InitCell<[u32; 4]> = InitCell::new();
 
-        assert!(STORAGE.set([1, 2, 3, 4]));
-        assert_eq!(*STORAGE.get(), [1, 2, 3, 4]);
+        assert!(CELL.set([1, 2, 3, 4]));
+        assert_eq!(*CELL.get(), [1, 2, 3, 4]);
     }
 
-    // Ensure dropping a `Storage<T>` drops `T`.
+    // Ensure dropping a `InitCell<T>` drops `T`.
     #[test]
     fn drop_inners_on_drop() {
         let drop_flag = Arc::new(RwLock::new(false));
         let dropping_struct = DroppingStruct(drop_flag.clone());
 
         {
-            let storage = Storage::new();
-            assert!(storage.set(dropping_struct));
+            let cell = InitCell::new();
+            assert!(cell.set(dropping_struct));
             assert_eq!(*drop_flag.read().unwrap(), false);
         }
 
@@ -269,21 +269,21 @@ mod storage_tests {
 
     #[test]
     fn clone() {
-        let storage: Storage<u32> = Storage::new();
-        assert!(storage.try_get().is_none());
+        let cell: InitCell<u32> = InitCell::new();
+        assert!(cell.try_get().is_none());
 
-        let storage_clone = storage.clone();
-        assert!(storage_clone.try_get().is_none());
+        let cell_clone = cell.clone();
+        assert!(cell_clone.try_get().is_none());
 
-        assert!(storage.set(10));
-        let storage_clone = storage.clone();
-        assert_eq!(*storage_clone.get(), 10);
+        assert!(cell.set(10));
+        let cell_clone = cell.clone();
+        assert_eq!(*cell_clone.get(), 10);
     }
 }
 
 #[cfg(feature = "tls")]
-mod storage_tests_tls {
-    use super::state::LocalStorage;
+mod cell_tests_tls {
+    use super::state::LocalInitCell;
 
     use std::thread;
     use std::cell::Cell;
@@ -291,61 +291,61 @@ mod storage_tests_tls {
 
     #[test]
     fn simple_put_get() {
-        static STORAGE: LocalStorage<u32> = LocalStorage::new();
+        static CELL: LocalInitCell<u32> = LocalInitCell::new();
 
-        assert!(STORAGE.set(|| 10));
-        assert_eq!(*STORAGE.get(), 10);
+        assert!(CELL.set(|| 10));
+        assert_eq!(*CELL.get(), 10);
     }
 
     #[test]
     fn no_double_put() {
-        static STORAGE: LocalStorage<u32> = LocalStorage::new();
+        static CELL: LocalInitCell<u32> = LocalInitCell::new();
 
-        assert!(STORAGE.set(|| 1));
-        assert!(!STORAGE.set(|| 5));
-        assert_eq!(*STORAGE.get(), 1);
+        assert!(CELL.set(|| 1));
+        assert!(!CELL.set(|| 5));
+        assert_eq!(*CELL.get(), 1);
     }
 
     #[test]
     fn many_puts_only_one_succeeds() {
-        static STORAGE: LocalStorage<u32> = LocalStorage::new();
+        static CELL: LocalInitCell<u32> = LocalInitCell::new();
 
         let mut threads = vec![];
         for _ in 0..1000 {
             threads.push(thread::spawn(|| {
-                let was_set = STORAGE.set(|| 10);
-                assert_eq!(*STORAGE.get(), 10);
+                let was_set = CELL.set(|| 10);
+                assert_eq!(*CELL.get(), 10);
                 was_set
             }))
         }
 
         let results: Vec<bool> = threads.into_iter().map(|t| t.join().unwrap()).collect();
         assert_eq!(results.into_iter().filter(|&b| b).count(), 1);
-        assert_eq!(*STORAGE.get(), 10);
+        assert_eq!(*CELL.get(), 10);
     }
 
     #[test]
-    fn storage_tls_really_is_tls() {
+    fn cell_tls_really_is_tls() {
         const THREADS: usize = 50;
-        static STORAGE: LocalStorage<Cell<u8>> = LocalStorage::new();
+        static CELL: LocalInitCell<Cell<u8>> = LocalInitCell::new();
 
         let barriers = Arc::new((Barrier::new(THREADS), Barrier::new(THREADS)));
-        assert!(STORAGE.set(|| Cell::new(0)));
+        assert!(CELL.set(|| Cell::new(0)));
 
         let mut threads = vec![];
         for i in 1..50 {
             let barriers = barriers.clone();
             threads.push(thread::spawn(move || {
                 barriers.0.wait();
-                STORAGE.get().set(i);
-                let val = STORAGE.get().get();
+                CELL.get().set(i);
+                let val = CELL.get().get();
                 barriers.1.wait();
                 val
             }));
         }
 
         barriers.0.wait();
-        STORAGE.get().set(0);
+        CELL.get().set(0);
         barriers.1.wait();
 
         let vals = threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>();
@@ -353,19 +353,19 @@ mod storage_tests_tls {
             assert_eq!((i + 1) as u8, val);
         }
 
-        assert_eq!(STORAGE.get().get(), 0);
+        assert_eq!(CELL.get().get(), 0);
     }
 
     #[test]
-    fn storage_tls_really_is_tls_take_2() {
-        static STORAGE: LocalStorage<Cell<u8>> = LocalStorage::new();
+    fn cell_tls_really_is_tls_take_2() {
+        static CELL: LocalInitCell<Cell<u8>> = LocalInitCell::new();
 
         thread::spawn(|| {
-            assert!(STORAGE.set(|| Cell::new(1)));
-            STORAGE.get().set(2);
+            assert!(CELL.set(|| Cell::new(1)));
+            CELL.get().set(2);
 
             thread::spawn(|| {
-                assert_eq!(STORAGE.get().get(), 1);
+                assert_eq!(CELL.get().get(), 1);
             }).join().expect("inner join");
         }).join().expect("outer join");
     }

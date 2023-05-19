@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::thread_local::ThreadLocal;
-use crate::storage::Storage;
+use crate::cell::InitCell;
 
 pub struct LocalValue<T> {
     tls: ThreadLocal<T>,
@@ -23,36 +23,36 @@ impl<T: Send + 'static> LocalValue<T> {
     }
 }
 
-/// A single storage location for global access to thread-local values.
+/// A thread-local init-once-per-thread cell for thread-local values.
 ///
-/// A `LocalStorage` instance allows global access to a `n` per-thread values,
+/// A `LocalInitCell` instance allows global access to a `n` per-thread values,
 /// all of which are initialized in the same manner when the value is first
 /// retrieved from a thread.
 //
-/// The initialization function for values in `LocalStorage` is specified via
+/// The initialization function for values in `LocalInitCell` is specified via
 /// the [set](#method.set) method. The initialization function must be set
 /// before a value is attempted to be retrieved via the [get](#method.get)
 /// method. The [try_get](#method.try_get) can be used to determine whether the
-/// `LocalStorage` has been initialized before attempting to retrieve a value.
+/// `LocalInitCell` has been initialized before attempting to retrieve a value.
 ///
-/// For safety reasons, values stored in `LocalStorage` must be `Send +
+/// For safety reasons, values stored in `LocalInitCell` must be `Send +
 /// 'static`.
 ///
-/// # Comparison with `Storage`
+/// # Comparison with `InitCell`
 ///
 /// When the use-case allows, there are two primary advantages to using a
-/// `LocalStorage` instance over a `Storage` instance:
+/// `LocalInitCell` instance over a `InitCell` instance:
 ///
-///   * Values stored in `LocalStorage` do not need to implement `Sync`.
+///   * Values stored in `LocalInitCell` do not need to implement `Sync`.
 ///   * There is no synchronization overhead when setting a value.
 ///
 /// The primary disadvantages are:
 ///
-///   * Values are recomputed once per thread on `get()` where `Storage` never
+///   * Values are recomputed once per thread on `get()` where `InitCell` never
 ///     recomputes values.
-///   * Values need to be `'static` where `Storage` imposes no such restriction.
+///   * Values need to be `'static` where `InitCell` imposes no such restriction.
 ///
-/// Values `LocalStorage` are _not_ the same across different threads. Any
+/// Values `LocalInitCell` are _not_ the same across different threads. Any
 /// modifications made to the stored value in one thread are _not_ visible in
 /// another. Furthermore, because Rust reuses thread IDs, a new thread is _not_
 /// guaranteed to receive a newly initialized value on its first call to `get`.
@@ -70,14 +70,14 @@ impl<T: Send + 'static> LocalValue<T> {
 ///
 /// # Example
 ///
-/// The following example uses `LocalStorage` to store a per-thread count:
+/// The following example uses `LocalInitCell` to store a per-thread count:
 ///
 /// ```rust
 /// # extern crate state;
 /// # use std::cell::Cell;
 /// # use std::thread;
-/// # use state::LocalStorage;
-/// static COUNT: LocalStorage<Cell<usize>> = LocalStorage::new();
+/// # use state::LocalInitCell;
+/// static COUNT: LocalInitCell<Cell<usize>> = LocalInitCell::new();
 ///
 /// fn check_count() {
 ///     let count = COUNT.get();
@@ -108,27 +108,27 @@ impl<T: Send + 'static> LocalValue<T> {
 ///     }
 /// }
 /// ```
-pub struct LocalStorage<T> {
-    storage: Storage<LocalValue<T>>
+pub struct LocalInitCell<T> {
+    cell: InitCell<LocalValue<T>>
 }
 
-impl<T> LocalStorage<T> {
-    /// Create a new, uninitialized storage location.
+impl<T> LocalInitCell<T> {
+    /// Create a new, uninitialized cell.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use state::LocalStorage;
+    /// use state::LocalInitCell;
     ///
-    /// static MY_GLOBAL: LocalStorage<String> = LocalStorage::new();
+    /// static MY_GLOBAL: LocalInitCell<String> = LocalInitCell::new();
     /// ```
-    pub const fn new() -> LocalStorage<T> {
-        LocalStorage { storage: Storage::new() }
+    pub const fn new() -> LocalInitCell<T> {
+        LocalInitCell { cell: InitCell::new() }
     }
 }
 
-impl<T: Send + 'static> LocalStorage<T> {
-    /// Sets the initialization function for this local storage unit to
+impl<T: Send + 'static> LocalInitCell<T> {
+    /// Sets the initialization function for this local cell to
     /// `state_init` if it has not already been set before. The function will be
     /// used to initialize values on the first access from a thread with a new
     /// thread ID.
@@ -139,8 +139,8 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # use state::LocalStorage;
-    /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
+    /// # use state::LocalInitCell;
+    /// static MY_GLOBAL: LocalInitCell<&'static str> = LocalInitCell::new();
     ///
     /// assert_eq!(MY_GLOBAL.set(|| "Hello, world!"), true);
     /// assert_eq!(MY_GLOBAL.set(|| "Goodbye, world!"), false);
@@ -149,10 +149,10 @@ impl<T: Send + 'static> LocalStorage<T> {
     pub fn set<F: Fn() -> T>(&self, state_init: F) -> bool
         where F: Send + Sync + 'static
     {
-        self.storage.set(LocalValue::new(state_init))
+        self.cell.set(LocalValue::new(state_init))
     }
 
-    /// Attempts to borrow the value in this storage location. If this is the
+    /// Attempts to borrow the value in this cell. If this is the
     /// first time a thread with the current thread ID has called `get` or
     /// `try_get` for `self`, the value will be initialized using the
     /// initialization function.
@@ -163,8 +163,8 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # use state::LocalStorage;
-    /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
+    /// # use state::LocalInitCell;
+    /// static MY_GLOBAL: LocalInitCell<&'static str> = LocalInitCell::new();
     ///
     /// assert_eq!(MY_GLOBAL.try_get(), None);
     ///
@@ -174,7 +174,7 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// ```
     #[inline]
     pub fn try_get(&self) -> Option<&T> {
-        self.storage.try_get().map(|v| v.get())
+        self.cell.try_get().map(|v| v.get())
     }
 
     /// If this is the first time a thread with the current thread ID has called
@@ -190,26 +190,26 @@ impl<T: Send + 'static> LocalStorage<T> {
     /// # Example
     ///
     /// ```rust
-    /// # use state::LocalStorage;
-    /// static MY_GLOBAL: LocalStorage<&'static str> = LocalStorage::new();
+    /// # use state::LocalInitCell;
+    /// static MY_GLOBAL: LocalInitCell<&'static str> = LocalInitCell::new();
     ///
     /// MY_GLOBAL.set(|| "Hello, world!");
     /// assert_eq!(*MY_GLOBAL.get(), "Hello, world!");
     /// ```
     #[inline]
     pub fn get(&self) -> &T {
-        self.try_get().expect("localstorage::get(): called get() before set()")
+        self.try_get().expect("localcell::get(): called get() before set()")
     }
 }
 
 #[cfg(test)] static_assertions::assert_impl_all!(LocalValue<u8>: Send, Sync);
-#[cfg(test)] static_assertions::assert_impl_all!(LocalStorage<u8>: Send, Sync);
+#[cfg(test)] static_assertions::assert_impl_all!(LocalInitCell<u8>: Send, Sync);
 
-impl<T: fmt::Debug + Send + 'static> fmt::Debug for LocalStorage<T> {
+impl<T: fmt::Debug + Send + 'static> fmt::Debug for LocalInitCell<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self.try_get() {
             Some(object) => object.fmt(f),
-            None => write!(f, "[uninitialized local storage]")
+            None => write!(f, "[uninitialized local cell]")
         }
     }
 }

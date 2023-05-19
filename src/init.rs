@@ -1,5 +1,5 @@
-use crate::sync::atomic::{AtomicBool, Ordering::{AcqRel, Acquire, Release, Relaxed}};
-use crate::thread::yield_now;
+use crate::shim::sync::atomic::{AtomicBool, Ordering::{AcqRel, Acquire, Release, Relaxed}};
+use crate::shim::thread::yield_now;
 
 /// An atomic initializer: mutual exclusion during initialization.
 pub struct Init {
