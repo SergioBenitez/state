@@ -10,15 +10,15 @@ use std::cell::Cell;
 
 use test::Bencher;
 
-type Container = state::Container![Send + Sync];
+type TypeMap = state::TypeMap![Send + Sync];
 
 lazy_static! {
     static ref ATOMIC: AtomicUsize = AtomicUsize::new(0);
 }
 
 #[bench]
-fn container_get(b: &mut Bencher) {
-    static STATE: Container = Container::new();
+fn type_map_get(b: &mut Bencher) {
+    static STATE: TypeMap = TypeMap::new();
     STATE.set(AtomicUsize::new(0));
 
     b.iter(|| {
@@ -47,8 +47,8 @@ fn local_cell_get(b: &mut Bencher) {
 }
 
 #[bench]
-fn container_local_get(b: &mut Bencher) {
-    static STATE: Container = Container::new();
+fn type_map_local_get(b: &mut Bencher) {
+    static STATE: TypeMap = TypeMap::new();
     STATE.set_local(|| AtomicUsize::new(0));
 
     b.iter(|| {
@@ -64,8 +64,8 @@ fn lazy_static_get(b: &mut Bencher) {
 }
 
 #[bench]
-fn container_get_many_threads(b: &mut Bencher) {
-    static STATE: Container = Container::new();
+fn type_map_get_many_threads(b: &mut Bencher) {
+    static STATE: TypeMap = TypeMap::new();
     STATE.set(AtomicUsize::new(0));
 
     b.iter(|| {
@@ -81,8 +81,8 @@ fn container_get_many_threads(b: &mut Bencher) {
 }
 
 #[bench]
-fn container_local_get_many_threads(b: &mut Bencher) {
-    static STATE: Container = Container::new();
+fn type_map_local_get_many_threads(b: &mut Bencher) {
+    static STATE: TypeMap = TypeMap::new();
     STATE.set_local(|| AtomicUsize::new(0));
 
     b.iter(|| {
@@ -98,10 +98,10 @@ fn container_local_get_many_threads(b: &mut Bencher) {
 }
 
 #[bench]
-fn container_freeze_many_threads(b: &mut Bencher) {
+fn type_map_freeze_many_threads(b: &mut Bencher) {
     use std::sync::Arc;
 
-    let mut state: Container = Container::new();
+    let mut state: TypeMap = TypeMap::new();
     state.set(AtomicUsize::new(0));
     state.freeze();
 

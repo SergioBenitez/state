@@ -6,7 +6,7 @@
 //! This crate allows you to safely and effortlessly manage global and/or
 //! thread-local state. Three primitives are provided for state management:
 //!
-//!  * **[`struct@Container`]:** Type-based storage for many values.
+//!  * **[`struct@TypeMap`]:** Type-based storage for many values.
 //!  * **[`InitCell`]:** Thread-safe init-once storage for a single value.
 //!  * **[`LocalInitCell`]:** Thread-local init-once-per-thread cell.
 //!
@@ -218,7 +218,7 @@
 //!
 //! `state` has been extensively vetted, manually and automatically, for soundness
 //! and correctness. _All_ unsafe code, including in internal concurrency
-//! primitives, `Container`, and `InitCell` are exhaustively verified for pairwise
+//! primitives, `TypeMap`, and `InitCell` are exhaustively verified for pairwise
 //! concurrency correctness and internal aliasing exclusion with `loom`.
 //! Multithreading invariants, aliasing invariants, and other soundness properties
 //! are verified with `miri`. Verification is run by the CI on every commit.
@@ -226,7 +226,7 @@
 //! ## Performance
 //!
 //! `state` is heavily tuned to perform optimally. `get{_local}` and
-//! `set{_local}` calls to a `Container` incur overhead due to type lookup.
+//! `set{_local}` calls to a `TypeMap` incur overhead due to type lookup.
 //! `InitCell`, on the other hand, is optimal for global storage retrieval; it is
 //! _slightly faster_ than accessing global state initialized through
 //! `lazy_static!`, more so across many threads. `LocalInitCell` incurs slight
@@ -251,9 +251,9 @@ mod init;
 mod shim;
 
 #[doc(hidden)]
-pub mod container;
+pub mod type_map;
 
-pub use container::Container;
+pub use type_map::TypeMap;
 pub use cell::InitCell;
 
 #[cfg(feature = "tls")] mod tls;

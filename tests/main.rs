@@ -27,48 +27,48 @@ fn test_dropping_struct() {
     assert_eq!(*drop_flag.read().unwrap(), true);
 }
 
-mod container_tests {
+mod type_map_tests {
     use super::{DroppingStruct, DroppingStructWrap};
-    use super::state::Container;
+    use super::state::TypeMap;
     use std::sync::{Arc, RwLock};
     use std::thread;
 
-    // We use one `CONTAINER` to get an implicit test since each `test` runs in
+    // We use one `TYPE_MAP` to get an implicit test since each `test` runs in
     // a different thread. This means we have to `set` different types in each
     // test if we want the `set` to succeed.
-    static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
 
     #[test]
     fn simple_set_get() {
-        assert!(CONTAINER.set(1u32));
-        assert_eq!(*CONTAINER.get::<u32>(), 1);
+        assert!(TYPE_MAP.set(1u32));
+        assert_eq!(*TYPE_MAP.get::<u32>(), 1);
     }
 
     #[test]
     fn dst_set_get() {
-        assert!(CONTAINER.set::<[u32; 4]>([1, 2, 3, 4u32]));
-        assert_eq!(*CONTAINER.get::<[u32; 4]>(), [1, 2, 3, 4]);
+        assert!(TYPE_MAP.set::<[u32; 4]>([1, 2, 3, 4u32]));
+        assert_eq!(*TYPE_MAP.get::<[u32; 4]>(), [1, 2, 3, 4]);
     }
 
     #[test]
     fn set_get_remote() {
         thread::spawn(|| {
-            CONTAINER.set(10isize);
+            TYPE_MAP.set(10isize);
         }).join().unwrap();
 
-        assert_eq!(*CONTAINER.get::<isize>(), 10);
+        assert_eq!(*TYPE_MAP.get::<isize>(), 10);
     }
 
     #[test]
     fn two_put_get() {
-        assert!(CONTAINER.set("Hello, world!".to_string()));
+        assert!(TYPE_MAP.set("Hello, world!".to_string()));
 
-        let s_old = CONTAINER.get::<String>();
+        let s_old = TYPE_MAP.get::<String>();
         assert_eq!(s_old, "Hello, world!");
 
-        assert!(!CONTAINER.set::<String>("Bye bye!".into()));
-        assert_eq!(CONTAINER.get::<String>(), "Hello, world!");
-        assert_eq!(CONTAINER.get::<String>(), s_old);
+        assert!(!TYPE_MAP.set::<String>("Bye bye!".into()));
+        assert_eq!(TYPE_MAP.get::<String>(), "Hello, world!");
+        assert_eq!(TYPE_MAP.get::<String>(), s_old);
     }
 
     #[test]
@@ -76,13 +76,13 @@ mod container_tests {
         let mut threads = vec![];
         for _ in 0..1000 {
             threads.push(thread::spawn(|| {
-                CONTAINER.set(10i64)
+                TYPE_MAP.set(10i64)
             }))
         }
 
         let results: Vec<bool> = threads.into_iter().map(|t| t.join().unwrap()).collect();
         assert_eq!(results.into_iter().filter(|&b| b).count(), 1);
-        assert_eq!(*CONTAINER.get::<i64>(), 10);
+        assert_eq!(*TYPE_MAP.get::<i64>(), 10);
     }
 
     // Ensure setting when already set doesn't cause a drop.
@@ -94,12 +94,12 @@ mod container_tests {
         let _drop_flag_ignore = Arc::new(RwLock::new(false));
         let _dropping_struct_ignore = DroppingStruct(_drop_flag_ignore.clone());
 
-        CONTAINER.set::<DroppingStruct>(dropping_struct);
-        assert!(!CONTAINER.set::<DroppingStruct>(_dropping_struct_ignore));
+        TYPE_MAP.set::<DroppingStruct>(dropping_struct);
+        assert!(!TYPE_MAP.set::<DroppingStruct>(_dropping_struct_ignore));
         assert_eq!(*drop_flag.read().unwrap(), false);
     }
 
-    // Ensure dropping a container drops its contents.
+    // Ensure dropping a type_map drops its contents.
     #[test]
     fn drop_inners_on_drop() {
         let drop_flag_a = Arc::new(RwLock::new(false));
@@ -109,11 +109,11 @@ mod container_tests {
         let dropping_struct_b = DroppingStructWrap(DroppingStruct(drop_flag_b.clone()));
 
         {
-            let container = <Container![Send + Sync]>::new();
-            container.set(dropping_struct_a);
+            let type_map = <TypeMap![Send + Sync]>::new();
+            type_map.set(dropping_struct_a);
             assert_eq!(*drop_flag_a.read().unwrap(), false);
 
-            container.set(dropping_struct_b);
+            type_map.set(dropping_struct_b);
             assert_eq!(*drop_flag_a.read().unwrap(), false);
             assert_eq!(*drop_flag_b.read().unwrap(), false);
         }
@@ -124,34 +124,34 @@ mod container_tests {
 }
 
 #[cfg(feature = "tls")]
-mod container_tests_tls {
+mod type_map_tests_tls {
     use std::sync::{Arc, Barrier};
-    use super::state::Container;
+    use super::state::TypeMap;
     use std::cell::Cell;
     use std::thread;
 
-    // We use one `CONTAINER` to get an implicit test since each `test` runs in
+    // We use one `TYPE_MAP` to get an implicit test since each `test` runs in
     // a different thread. This means we have to `set` different types in each
     // test if we want the `set` to succeed.
-    static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
 
     #[test]
     fn test_simple() {
-        assert!(CONTAINER.try_get_local::<u32>().is_none());
-        assert!(CONTAINER.set_local(|| 1u32));
-        assert_eq!(*CONTAINER.get_local::<u32>(), 1);
+        assert!(TYPE_MAP.try_get_local::<u32>().is_none());
+        assert!(TYPE_MAP.set_local(|| 1u32));
+        assert_eq!(*TYPE_MAP.get_local::<u32>(), 1);
     }
 
     #[test]
     fn test_double_put() {
-        assert!(CONTAINER.set_local(|| 1i32));
-        assert!(!CONTAINER.set_local(|| 1i32));
+        assert!(TYPE_MAP.set_local(|| 1i32));
+        assert!(!TYPE_MAP.set_local(|| 1i32));
     }
 
     #[test]
     fn not_unique_when_sent() {
-        assert!(CONTAINER.set_local(|| 1i64));
-        let value = CONTAINER.get_local::<i64>();
+        assert!(TYPE_MAP.set_local(|| 1i64));
+        let value = TYPE_MAP.get_local::<i64>();
 
         thread::spawn(move || {
             assert_eq!(*value, 1i64);
@@ -159,27 +159,27 @@ mod container_tests_tls {
     }
 
     #[test]
-    fn container_tls_really_is_tls() {
+    fn type_map_tls_really_is_tls() {
         const THREADS: usize = 50;
 
         let barriers = Arc::new((Barrier::new(THREADS), Barrier::new(THREADS)));
-        assert!(CONTAINER.set_local(|| Cell::new(0u8)));
+        assert!(TYPE_MAP.set_local(|| Cell::new(0u8)));
 
         let mut threads = vec![];
         for i in 1..THREADS {
             let barriers = barriers.clone();
             threads.push(thread::spawn(move || {
                 barriers.0.wait();
-                assert_eq!(CONTAINER.get_local::<Cell<u8>>().get(), 0);
-                CONTAINER.get_local::<Cell<u8>>().set(i as u8);
-                let v = CONTAINER.get_local::<Cell<u8>>().get();
+                assert_eq!(TYPE_MAP.get_local::<Cell<u8>>().get(), 0);
+                TYPE_MAP.get_local::<Cell<u8>>().set(i as u8);
+                let v = TYPE_MAP.get_local::<Cell<u8>>().get();
                 barriers.1.wait();
                 v
             }));
         }
 
         barriers.0.wait();
-        CONTAINER.get_local::<Cell<u8>>().set(0);
+        TYPE_MAP.get_local::<Cell<u8>>().set(0);
         barriers.1.wait();
 
         let vals = threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>();
@@ -187,17 +187,17 @@ mod container_tests_tls {
             assert_eq!((i + 1) as u8, val);
         }
 
-        assert_eq!(CONTAINER.get_local::<Cell<u8>>().get(), 0);
+        assert_eq!(TYPE_MAP.get_local::<Cell<u8>>().get(), 0);
     }
 
     #[test]
-    fn container_tls_really_is_tls_take_2() {
+    fn type_map_tls_really_is_tls_take_2() {
         thread::spawn(|| {
-            assert!(CONTAINER.set_local(|| Cell::new(1i8)));
-            CONTAINER.get_local::<Cell<i8>>().set(2);
+            assert!(TYPE_MAP.set_local(|| Cell::new(1i8)));
+            TYPE_MAP.get_local::<Cell<i8>>().set(2);
 
             thread::spawn(|| {
-                assert_eq!(CONTAINER.get_local::<Cell<i8>>().get(), 1);
+                assert_eq!(TYPE_MAP.get_local::<Cell<i8>>().get(), 1);
             }).join().expect("inner join");
         }).join().expect("outer join");
     }

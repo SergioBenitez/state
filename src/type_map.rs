@@ -12,80 +12,81 @@ use crate::shim::thread::yield_now;
 #[cfg(feature = "tls")]
 use crate::tls::LocalValue;
 
-/// A container for global type-based state.
+/// A type map storing values based on types.
 ///
-/// A container can store at most _one_ instance of given type as well as _n_
+/// A type map stores at most _one_ instance of given type as well as _n_
 /// thread-local instances of a given type.
 ///
 /// ## Type Bounds
 ///
-/// A `Container` can store values that are both `Send + Sync`, just `Send`, or
-/// neither. The [`Container!`] macro is used to specify the type of container:
+/// A `TypeMap` can store values that are both `Send + Sync`, just `Send`, or
+/// neither. The [`TypeMap!`](macro.TypeMap.html) macro is used to specify the
+/// kind of type map:
 ///
 /// ```rust
-/// use state::Container;
+/// use state::TypeMap;
 ///
-/// // Values must implement `Send + Sync`. The container itself is `Send + Sync`.
-/// let container: Container![Send + Sync] = <Container![Send + Sync]>::new();
-/// let container: Container![Sync + Send] = <Container![Sync + Send]>::new();
+/// // Values must implement `Send + Sync`. The type_map itself is `Send + Sync`.
+/// let type_map: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
+/// let type_map: TypeMap![Sync + Send] = <TypeMap![Sync + Send]>::new();
 ///
-/// // Values must implement `Send`. The container itself is `Send`, `!Sync`.
-/// let container: Container![Send] = <Container![Send]>::new();
+/// // Values must implement `Send`. The type_map itself is `Send`, `!Sync`.
+/// let type_map: TypeMap![Send] = <TypeMap![Send]>::new();
 ///
-/// // Values needn't implement `Send` nor `Sync`. `Container` is `!Send`, `!Sync`.
-/// let container: Container![] = <Container![]>::new();
+/// // Values needn't implement `Send` nor `Sync`. `TypeMap` is `!Send`, `!Sync`.
+/// let type_map: TypeMap![] = <TypeMap![]>::new();
 /// ```
 ///
 /// ## Setting State
 ///
-/// Global state is set via the [`set()`](Container::set()) method and retrieved
-/// via the [`get()`](Container::get()) method. The type of the value being set
-/// must meet the bounds of the `Container`.
+/// Global state is set via the [`set()`](TypeMap::set()) method and retrieved
+/// via the [`get()`](TypeMap::get()) method. The type of the value being set
+/// must meet the bounds of the `TypeMap`.
 ///
 /// ```rust
-/// use state::Container;
+/// use state::TypeMap;
 ///
 /// fn f_send_sync<T: Send + Sync + Clone + 'static>(value: T) {
-///     let container = <Container![Send + Sync]>::new();
-///     container.set(value.clone());
+///     let type_map = <TypeMap![Send + Sync]>::new();
+///     type_map.set(value.clone());
 ///
-///     let container = <Container![Send]>::new();
-///     container.set(value.clone());
+///     let type_map = <TypeMap![Send]>::new();
+///     type_map.set(value.clone());
 ///
-///     let container = <Container![]>::new();
-///     container.set(value.clone());
+///     let type_map = <TypeMap![]>::new();
+///     type_map.set(value.clone());
 /// }
 ///
 /// fn f_send<T: Send + Clone + 'static>(value: T) {
 ///     // This would fail to compile since `T` may not be `Sync`.
-///     // let container = <Container![Send + Sync]>::new();
-///     // container.set(value.clone());
+///     // let type_map = <TypeMap![Send + Sync]>::new();
+///     // type_map.set(value.clone());
 ///
-///     let container = <Container![Send]>::new();
-///     container.set(value.clone());
+///     let type_map = <TypeMap![Send]>::new();
+///     type_map.set(value.clone());
 ///
-///     let container = <Container![]>::new();
-///     container.set(value.clone());
+///     let type_map = <TypeMap![]>::new();
+///     type_map.set(value.clone());
 /// }
 ///
 /// fn f<T: 'static>(value: T) {
 ///     // This would fail to compile since `T` may not be `Sync` or `Send`.
-///     // let container = <Container![Send + Sync]>::new();
-///     // container.set(value.clone());
+///     // let type_map = <TypeMap![Send + Sync]>::new();
+///     // type_map.set(value.clone());
 ///
 ///     // This would fail to compile since `T` may not be `Send`.
-///     // let container = <Container![Send]>::new();
-///     // container.set(value.clone());
+///     // let type_map = <TypeMap![Send]>::new();
+///     // type_map.set(value.clone());
 ///
-///     let container = <Container![]>::new();
-///     container.set(value);
+///     let type_map = <TypeMap![]>::new();
+///     type_map.set(value);
 /// }
 ///
-/// // If `Container` is `Send + Sync`, it can be `const`-constructed.
-/// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+/// // If `TypeMap` is `Send + Sync`, it can be `const`-constructed.
+/// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
 ///
-/// CONTAINER.set(String::new());
-/// CONTAINER.get::<String>();
+/// TYPE_MAP.set(String::new());
+/// TYPE_MAP.get::<String>();
 /// ```
 ///
 /// ## Freezing
@@ -93,18 +94,18 @@ use crate::tls::LocalValue;
 /// By default, all `get`, `set`, `get_local`, and `set_local` calls result in
 /// synchronization overhead for safety. However, if calling `set` or
 /// `set_local` is no longer required, the overhead can be eliminated by
-/// _freezing_ the `Container`. A frozen container can only be read and never
-/// written to. Attempts to write to a frozen container will be ignored.
+/// _freezing_ the `TypeMap`. A frozen type map can only be read and never
+/// written to. Attempts to write to a frozen type map will be ignored.
 ///
-/// To freeze a `Container`, call [`freeze()`](Container::freeze()). A frozen
-/// container can never be thawed. To check if a container is frozen, call
-/// [`is_frozen()`](Container::is_frozen()).
+/// To freeze a `TypeMap`, call [`freeze()`](TypeMap::freeze()). A frozen map
+/// can never be thawed. To check if a type map is frozen, call
+/// [`is_frozen()`](TypeMap::is_frozen()).
 ///
 /// ## Thread-Local State
 ///
-/// Thread-local state on a `Send + Sync` container is set via the
-/// [`set_local()`](Container::set_local()) method and retrieved via the
-/// [`get_local()`](Container::get_local()) method. The type of the value being
+/// Thread-local state on a `Send + Sync` type map is set via the
+/// [`set_local()`](TypeMap::set_local()) method and retrieved via the
+/// [`get_local()`](TypeMap::get_local()) method. The type of the value being
 /// set must be transferable across thread boundaries but need not be
 /// thread-safe. In other words, it must satisfy `Send + 'static` but not
 /// necessarily `Sync`. Values retrieved from thread-local state are exactly
@@ -131,18 +132,18 @@ use crate::tls::LocalValue;
 /// # impl T { fn new() -> T { T } }
 /// # #[cfg(not(feature = "tls"))] fn test() { }
 /// # #[cfg(feature = "tls")] fn test() {
-/// use state::Container;
+/// use state::TypeMap;
 ///
-/// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+/// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
 ///
-/// CONTAINER.set_local(|| T::new());
-/// CONTAINER.get_local::<T>();
+/// TYPE_MAP.set_local(|| T::new());
+/// TYPE_MAP.get_local::<T>();
 /// # }
 /// # fn main() { test() }
 /// ```
-pub struct Container<K: kind::Kind> {
+pub struct TypeMap<K: kind::Kind> {
     init: Init,
-    map: UnsafeCell<Option<TypeMap>>,
+    map: UnsafeCell<Option<TypeIdMap>>,
     mutex: AtomicUsize,
     frozen: bool,
     /// Force !Send (and carry the type).
@@ -162,22 +163,22 @@ mod kind {
     impl Kind for Neither {}
 }
 
-pub type ContainerSend = Container<kind::Send>;
-pub type ContainerSendSync = Container<kind::SendSync>;
-pub type ContainerNeither = Container<kind::Neither>;
+pub type TypeMapSend = TypeMap<kind::Send>;
+pub type TypeMapSendSync = TypeMap<kind::SendSync>;
+pub type TypeMapNeither = TypeMap<kind::Neither>;
 
-/// Type constructor for [`Container`](struct@Container) variants.
+/// Type constructor for [`TypeMap`](struct@TypeMap) variants.
 #[macro_export]
-macro_rules! Container {
-    () => ($crate::container::ContainerNeither);
-    (Send) => ($crate::container::ContainerSend);
-    (Send + Sync) => ($crate::container::ContainerSendSync);
-    (Sync + Send) => ($crate::container::ContainerSendSync);
+macro_rules! TypeMap {
+    () => ($crate::type_map::TypeMapNeither);
+    (Send) => ($crate::type_map::TypeMapSend);
+    (Send + Sync) => ($crate::type_map::TypeMapSendSync);
+    (Sync + Send) => ($crate::type_map::TypeMapSendSync);
 }
 
 macro_rules! new {
     () => (
-        Container {
+        TypeMap {
             init: Init::new(),
             map: UnsafeCell::new(None),
             mutex: AtomicUsize::new(0),
@@ -187,7 +188,7 @@ macro_rules! new {
     )
 }
 
-type TypeMap = HashMap<TypeId, AnyObject, BuildHasherDefault<IdentHash>>;
+type TypeIdMap = HashMap<TypeId, AnyObject, BuildHasherDefault<IdentHash>>;
 
 /// FIXME: This is a hack so we can create a *mut dyn Any with a `const`. It
 /// simply erases `dyn Any`; `transmute` ensures that a `*mut dyn Any` and an
@@ -226,17 +227,17 @@ impl Drop for AnyObject {
     }
 }
 
-impl Container<kind::SendSync> {
-    /// Creates a new container with no stored values.
+impl TypeMap<kind::SendSync> {
+    /// Creates a new type map with no stored values.
     ///
     /// ## Example
     ///
-    /// Create a globally available state container:
+    /// Create a globally available type map:
     ///
     /// ```rust
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    /// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
     /// ```
     #[cfg(not(loom))]
     pub const fn new() -> Self {
@@ -262,12 +263,12 @@ impl Container<kind::SendSync> {
     ///
     /// ```rust
     /// # use std::sync::atomic::AtomicUsize;
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    /// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
     ///
-    /// assert_eq!(CONTAINER.set(AtomicUsize::new(0)), true);
-    /// assert_eq!(CONTAINER.set(AtomicUsize::new(1)), false);
+    /// assert_eq!(TYPE_MAP.set(AtomicUsize::new(0)), true);
+    /// assert_eq!(TYPE_MAP.set(AtomicUsize::new(1)), false);
     /// ```
     #[inline]
     pub fn set<T: Send + Sync + 'static>(&self, state: T) -> bool {
@@ -285,14 +286,14 @@ impl Container<kind::SendSync> {
     ///
     /// ```rust
     /// # use std::cell::Cell;
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    /// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
     ///
     /// struct MyState(Cell<usize>);
     ///
-    /// assert_eq!(CONTAINER.set_local(|| MyState(Cell::new(1))), true);
-    /// assert_eq!(CONTAINER.set_local(|| MyState(Cell::new(2))), false);
+    /// assert_eq!(TYPE_MAP.set_local(|| MyState(Cell::new(1))), true);
+    /// assert_eq!(TYPE_MAP.set_local(|| MyState(Cell::new(2))), false);
     /// ```
     #[inline]
     #[cfg(feature = "tls")]
@@ -311,15 +312,15 @@ impl Container<kind::SendSync> {
     ///
     /// ```rust
     /// # use std::cell::Cell;
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    /// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
     ///
     /// struct MyState(Cell<usize>);
     ///
-    /// CONTAINER.set_local(|| MyState(Cell::new(10)));
+    /// TYPE_MAP.set_local(|| MyState(Cell::new(10)));
     ///
-    /// let my_state = CONTAINER.try_get_local::<MyState>().expect("MyState");
+    /// let my_state = TYPE_MAP.try_get_local::<MyState>().expect("MyState");
     /// assert_eq!(my_state.0.get(), 10);
     /// ```
     #[inline]
@@ -342,49 +343,49 @@ impl Container<kind::SendSync> {
     ///
     /// ```rust
     /// # use std::cell::Cell;
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    /// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
     ///
     /// struct MyState(Cell<usize>);
     ///
-    /// CONTAINER.set_local(|| MyState(Cell::new(10)));
+    /// TYPE_MAP.set_local(|| MyState(Cell::new(10)));
     ///
-    /// let my_state = CONTAINER.get_local::<MyState>();
+    /// let my_state = TYPE_MAP.get_local::<MyState>();
     /// assert_eq!(my_state.0.get(), 10);
     /// ```
     #[inline]
     #[cfg(feature = "tls")]
     pub fn get_local<T: Send + 'static>(&self) -> &T {
         self.try_get_local::<T>()
-            .expect("container::get_local(): get_local() called before set_local()")
+            .expect("type_map::get_local(): get_local() called before set_local()")
     }
 }
 
-unsafe impl Send for Container<kind::SendSync> {  }
-unsafe impl Sync for Container<kind::SendSync> {  }
+unsafe impl Send for TypeMap<kind::SendSync> {  }
+unsafe impl Sync for TypeMap<kind::SendSync> {  }
 
-#[cfg(test)] static_assertions::assert_impl_all!(Container![Send + Sync]: Send, Sync);
-#[cfg(test)] static_assertions::assert_impl_all!(Container![Sync + Send]: Send, Sync);
+#[cfg(test)] static_assertions::assert_impl_all!(TypeMap![Send + Sync]: Send, Sync);
+#[cfg(test)] static_assertions::assert_impl_all!(TypeMap![Sync + Send]: Send, Sync);
 
-impl Container<kind::Send> {
-    /// Creates a new container with no stored values.
+impl TypeMap<kind::Send> {
+    /// Creates a new type map with no stored values.
     ///
     /// # Example
     ///
     /// ```rust
     /// use std::cell::Cell;
     ///
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// let container = <Container![Send]>::new();
+    /// let type_map = <TypeMap![Send]>::new();
     ///
     /// let value: Cell<u8> = Cell::new(10);
-    /// container.set(value);
-    /// assert_eq!(container.get::<Cell<u8>>().get(), 10);
+    /// type_map.set(value);
+    /// assert_eq!(type_map.get::<Cell<u8>>().get(), 10);
     ///
-    /// container.get::<Cell<u8>>().set(99);
-    /// assert_eq!(container.get::<Cell<u8>>().get(), 99);
+    /// type_map.get::<Cell<u8>>().set(99);
+    /// assert_eq!(type_map.get::<Cell<u8>>().get(), 99);
     /// ```
     pub fn new() -> Self {
         // SAFETY: this can't be `const` or we violate `Sync`.
@@ -404,11 +405,11 @@ impl Container<kind::Send> {
     ///
     /// ```rust
     /// # use std::sync::atomic::AtomicUsize;
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// let container = <Container![Send]>::new();
-    /// assert!(container.set(AtomicUsize::new(0)));
-    /// assert!(!container.set(AtomicUsize::new(1)));
+    /// let type_map = <TypeMap![Send]>::new();
+    /// assert!(type_map.set(AtomicUsize::new(0)));
+    /// assert!(!type_map.set(AtomicUsize::new(1)));
     /// ```
     #[inline]
     pub fn set<T: Send + 'static>(&self, state: T) -> bool {
@@ -416,29 +417,29 @@ impl Container<kind::Send> {
     }
 }
 
-unsafe impl Send for Container<kind::Send> {  }
+unsafe impl Send for TypeMap<kind::Send> {  }
 
-#[cfg(test)] static_assertions::assert_impl_all!(Container![Send]: Send);
-#[cfg(test)] static_assertions::assert_not_impl_any!(Container![Send]: Sync);
-#[cfg(test)] static_assertions::assert_not_impl_any!(Container<kind::Send>: Sync);
+#[cfg(test)] static_assertions::assert_impl_all!(TypeMap![Send]: Send);
+#[cfg(test)] static_assertions::assert_not_impl_any!(TypeMap![Send]: Sync);
+#[cfg(test)] static_assertions::assert_not_impl_any!(TypeMap<kind::Send>: Sync);
 
-impl Container<kind::Neither> {
-    /// Creates a new container with no stored values.
+impl TypeMap<kind::Neither> {
+    /// Creates a new type_map with no stored values.
     ///
     /// # Example
     ///
     /// ```rust
     /// use std::cell::Cell;
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// let container = <Container![]>::new();
+    /// let type_map = <TypeMap![]>::new();
     ///
     /// let value: Cell<u8> = Cell::new(10);
-    /// container.set(value);
-    /// assert_eq!(container.get::<Cell<u8>>().get(), 10);
+    /// type_map.set(value);
+    /// assert_eq!(type_map.get::<Cell<u8>>().get(), 10);
     ///
-    /// container.get::<Cell<u8>>().set(99);
-    /// assert_eq!(container.get::<Cell<u8>>().get(), 99);
+    /// type_map.get::<Cell<u8>>().set(99);
+    /// assert_eq!(type_map.get::<Cell<u8>>().get(), 99);
     /// ```
     pub fn new() -> Self {
         // SAFETY: this can't be `const` or we violate `Sync`.
@@ -458,11 +459,11 @@ impl Container<kind::Neither> {
     ///
     /// ```rust
     /// use std::cell::Cell;
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// let container = <Container![]>::new();
-    /// assert!(container.set(Cell::new(10)));
-    /// assert!(!container.set(Cell::new(17)));
+    /// let type_map = <TypeMap![]>::new();
+    /// assert!(type_map.set(Cell::new(10)));
+    /// assert!(!type_map.set(Cell::new(17)));
     /// ```
     #[inline]
     pub fn set<T: 'static>(&self, state: T) -> bool {
@@ -470,10 +471,10 @@ impl Container<kind::Neither> {
     }
 }
 
-#[cfg(test)] static_assertions::assert_not_impl_any!(Container![]: Send, Sync);
-#[cfg(test)] static_assertions::assert_not_impl_any!(Container<kind::Neither>: Send, Sync);
+#[cfg(test)] static_assertions::assert_not_impl_any!(TypeMap![]: Send, Sync);
+#[cfg(test)] static_assertions::assert_not_impl_any!(TypeMap<kind::Neither>: Send, Sync);
 
-impl<K: kind::Kind> Container<K> {
+impl<K: kind::Kind> TypeMap<K> {
     // Initializes the `map` if needed.
     unsafe fn init_map_if_needed(&self) {
         if self.init.needed() {
@@ -488,7 +489,7 @@ impl<K: kind::Kind> Container<K> {
     // and/or calls to `map_ref`.
     #[inline(always)]
     #[allow(clippy::mut_from_ref)]
-    unsafe fn map_mut(&self) -> &mut TypeMap {
+    unsafe fn map_mut(&self) -> &mut TypeIdMap {
         self.init_map_if_needed();
         self.map.with_mut(|ptr| (*ptr).as_mut().unwrap())
     }
@@ -498,7 +499,7 @@ impl<K: kind::Kind> Container<K> {
     // SAFETY: Caller must ensure mutual exclusion of calls to this function
     // and/or calls to `map_mut`.
     #[inline(always)]
-    unsafe fn map_ref(&self) -> &TypeMap {
+    unsafe fn map_ref(&self) -> &TypeIdMap {
         self.init_map_if_needed();
         self.map.with(|ptr| (*ptr).as_ref().unwrap())
     }
@@ -526,7 +527,7 @@ impl<K: kind::Kind> Container<K> {
     /// not dependent on the stability of memory slots in the map. It also needs
     /// to ensure that `f` does not panic if liveness is desired.
     unsafe fn with_map_ref<'a, F, T: 'a>(&'a self, f: F) -> T
-        where F: FnOnce(&'a TypeMap) -> T
+        where F: FnOnce(&'a TypeIdMap) -> T
     {
         // If we're frozen, there can't be any concurrent writers, so we're
         // free to read this safely without taking a lock.
@@ -549,18 +550,18 @@ impl<K: kind::Kind> Container<K> {
     ///
     /// ```rust
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    /// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
     ///
     /// struct MyState(AtomicUsize);
     ///
     /// // State for `T` is initially unset.
-    /// assert!(CONTAINER.try_get::<MyState>().is_none());
+    /// assert!(TYPE_MAP.try_get::<MyState>().is_none());
     ///
-    /// CONTAINER.set(MyState(AtomicUsize::new(0)));
+    /// TYPE_MAP.set(MyState(AtomicUsize::new(0)));
     ///
-    /// let my_state = CONTAINER.try_get::<MyState>().expect("MyState");
+    /// let my_state = TYPE_MAP.try_get::<MyState>().expect("MyState");
     /// assert_eq!(my_state.0.load(Ordering::Relaxed), 0);
     /// ```
     #[inline]
@@ -588,89 +589,89 @@ impl<K: kind::Kind> Container<K> {
     ///
     /// ```rust
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// static CONTAINER: Container![Send + Sync] = <Container![Send + Sync]>::new();
+    /// static TYPE_MAP: TypeMap![Send + Sync] = <TypeMap![Send + Sync]>::new();
     ///
     /// struct MyState(AtomicUsize);
     ///
-    /// CONTAINER.set(MyState(AtomicUsize::new(0)));
+    /// TYPE_MAP.set(MyState(AtomicUsize::new(0)));
     ///
-    /// let my_state = CONTAINER.get::<MyState>();
+    /// let my_state = TYPE_MAP.get::<MyState>();
     /// assert_eq!(my_state.0.load(Ordering::Relaxed), 0);
     /// ```
     #[inline]
     pub fn get<T: 'static>(&self) -> &T {
         self.try_get()
-            .expect("container::get(): get() called before set() for given type")
+            .expect("type_map::get(): get() called before set() for given type")
     }
 
-    /// Freezes the container. A frozen container disallows writes allowing for
+    /// Freezes the type_map. A frozen type_map disallows writes allowing for
     /// synchronization-free reads.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// // A new container starts unfrozen and can be written to.
-    /// let mut container = <Container![Send + Sync]>::new();
-    /// assert_eq!(container.set(1usize), true);
+    /// // A new type_map starts unfrozen and can be written to.
+    /// let mut type_map = <TypeMap![Send + Sync]>::new();
+    /// assert_eq!(type_map.set(1usize), true);
     ///
     /// // While unfrozen, `get`s require synchronization.
-    /// assert_eq!(container.get::<usize>(), &1);
+    /// assert_eq!(type_map.get::<usize>(), &1);
     ///
     /// // After freezing, calls to `set` or `set_local `will fail.
-    /// container.freeze();
-    /// assert_eq!(container.set(1u8), false);
-    /// assert_eq!(container.set("hello"), false);
+    /// type_map.freeze();
+    /// assert_eq!(type_map.set(1u8), false);
+    /// assert_eq!(type_map.set("hello"), false);
     ///
     /// // Calls to `get` or `get_local` are synchronization-free when frozen.
-    /// assert_eq!(container.try_get::<u8>(), None);
-    /// assert_eq!(container.get::<usize>(), &1);
+    /// assert_eq!(type_map.try_get::<u8>(), None);
+    /// assert_eq!(type_map.get::<usize>(), &1);
     /// ```
     #[inline(always)]
     pub fn freeze(&mut self) {
         self.frozen = true;
     }
 
-    /// Returns `true` if the container is frozen and `false` otherwise.
+    /// Returns `true` if the type_map is frozen and `false` otherwise.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// // A new container starts unfrozen and is frozen using `freeze`.
-    /// let mut container = <Container![Send]>::new();
-    /// assert_eq!(container.is_frozen(), false);
+    /// // A new type_map starts unfrozen and is frozen using `freeze`.
+    /// let mut type_map = <TypeMap![Send]>::new();
+    /// assert_eq!(type_map.is_frozen(), false);
     ///
-    /// container.freeze();
-    /// assert_eq!(container.is_frozen(), true);
+    /// type_map.freeze();
+    /// assert_eq!(type_map.is_frozen(), true);
     /// ```
     #[inline(always)]
     pub fn is_frozen(&self) -> bool {
         self.frozen
     }
 
-    /// Returns the number of distinctly typed values in the containers.
+    /// Returns the number of distinctly typed values in `self`.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// let container = <Container![Send + Sync]>::new();
-    /// assert_eq!(container.len(), 0);
+    /// let type_map = <TypeMap![Send + Sync]>::new();
+    /// assert_eq!(type_map.len(), 0);
     ///
-    /// assert_eq!(container.set(1usize), true);
-    /// assert_eq!(container.len(), 1);
+    /// assert_eq!(type_map.set(1usize), true);
+    /// assert_eq!(type_map.len(), 1);
     ///
-    /// assert_eq!(container.set(2usize), false);
-    /// assert_eq!(container.len(), 1);
+    /// assert_eq!(type_map.set(2usize), false);
+    /// assert_eq!(type_map.len(), 1);
     ///
-    /// assert_eq!(container.set(1u8), true);
-    /// assert_eq!(container.len(), 2);
+    /// assert_eq!(type_map.set(1u8), true);
+    /// assert_eq!(type_map.len(), 2);
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
@@ -678,18 +679,18 @@ impl<K: kind::Kind> Container<K> {
         unsafe { self.with_map_ref(|map| map.len()) }
     }
 
-    /// Returns `true` if the container holds zero values.
+    /// Returns `true` if `self` contains zero values.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use state::Container;
+    /// use state::TypeMap;
     ///
-    /// let container = <Container![Send + Sync]>::new();
-    /// assert!(container.is_empty());
+    /// let type_map = <TypeMap![Send + Sync]>::new();
+    /// assert!(type_map.is_empty());
     ///
-    /// assert_eq!(container.set(1usize), true);
-    /// assert!(!container.is_empty());
+    /// assert_eq!(type_map.set(1usize), true);
+    /// assert!(!type_map.is_empty());
     /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -709,27 +710,27 @@ impl<K: kind::Kind> Container<K> {
     }
 }
 
-impl Default for Container![Send + Sync] {
+impl Default for TypeMap![Send + Sync] {
     fn default() -> Self {
-        <Container![Send + Sync]>::new()
+        <TypeMap![Send + Sync]>::new()
     }
 }
 
-impl Default for Container![Send] {
+impl Default for TypeMap![Send] {
     fn default() -> Self {
-        <Container![Send]>::new()
+        <TypeMap![Send]>::new()
     }
 }
 
-impl Default for Container![] {
+impl Default for TypeMap![] {
     fn default() -> Self {
-        <Container![]>::new()
+        <TypeMap![]>::new()
     }
 }
 
-impl<K: kind::Kind> std::fmt::Debug for Container<K> {
+impl<K: kind::Kind> std::fmt::Debug for TypeMap<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Container")
+        f.debug_struct("TypeMap")
             .field("len", &self.len())
             .finish()
     }

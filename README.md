@@ -24,7 +24,7 @@ This library can be used to easily implement:
   * Singletons, Init-Once Values
   * Global or Thread-Local Caches, Thunks
   * Dynamically-Initialized Thread-Local Data
-  * Type Maps, Type-Based Containers
+  * Type Maps, Type-Based TypeMaps
 
 See the [documentation](https://docs.rs/state) for more.
 
@@ -53,7 +53,7 @@ The minimum supported Rust version is `1.32.0` as of `state` version `0.5.2`.
 
 `state` has been extensively vetted, manually and automatically, for soundness
 and correctness. _All_ unsafe code, including in internal concurrency
-primitives, `Container`, and `InitCell` are exhaustively verified for pairwise
+primitives, `TypeMap`, and `InitCell` are exhaustively verified for pairwise
 concurrency correctness and internal aliasing exclusion with `loom`.
 Multithreading invariants, aliasing invariants, and other soundness properties
 are verified with `miri`. Verification is run by the CI on every commit.

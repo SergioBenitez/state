@@ -101,23 +101,23 @@ fn cell() {
 }
 
 #[test]
-fn container1() {
-    use state::Container;
+fn type_map1() {
+    use state::TypeMap;
 
     const THREADS: usize = 2;
 
     loom::model(|| {
-        let container = Arc::new(<Container![Send + Sync]>::new());
+        let type_map = Arc::new(<TypeMap![Send + Sync]>::new());
 
         let mut threads = vec![];
         for _ in 1..(THREADS + 1) {
-            let container = container.clone();
+            let type_map = type_map.clone();
             let thread = thread::spawn(move || {
-                assert_eq!(container.try_get::<isize>(), None);
-                container.set::<usize>(10);
-                assert_eq!(container.try_get::<usize>(), Some(&10));
-                assert!(!container.set::<usize>(11));
-                assert_eq!(container.try_get::<usize>(), Some(&10));
+                assert_eq!(type_map.try_get::<isize>(), None);
+                type_map.set::<usize>(10);
+                assert_eq!(type_map.try_get::<usize>(), Some(&10));
+                assert!(!type_map.set::<usize>(11));
+                assert_eq!(type_map.try_get::<usize>(), Some(&10));
             });
 
             threads.push(thread);
@@ -127,29 +127,29 @@ fn container1() {
             thread.join().unwrap();
         }
 
-        assert_eq!(container.len(), 1);
+        assert_eq!(type_map.len(), 1);
     });
 }
 
 #[test]
-fn container2() {
-    use state::Container;
+fn type_map2() {
+    use state::TypeMap;
 
     const THREADS: usize = 2;
 
     loom::model(|| {
-        let container = Arc::new(<Container![Send + Sync]>::new());
+        let type_map = Arc::new(<TypeMap![Send + Sync]>::new());
 
         let mut threads = vec![];
         for _ in 1..(THREADS + 1) {
-            let container = container.clone();
+            let type_map = type_map.clone();
             let thread = thread::spawn(move || {
-                if container.try_get::<Box<usize>>().is_some() {
-                    assert!(!container.set::<Box<usize>>(Box::new(10)));
+                if type_map.try_get::<Box<usize>>().is_some() {
+                    assert!(!type_map.set::<Box<usize>>(Box::new(10)));
                 }
 
-                container.set::<Box<usize>>(Box::new(10));
-                assert_eq!(**container.try_get::<Box<usize>>().unwrap(), 10);
+                type_map.set::<Box<usize>>(Box::new(10));
+                assert_eq!(**type_map.try_get::<Box<usize>>().unwrap(), 10);
             });
 
             threads.push(thread);
@@ -159,6 +159,6 @@ fn container2() {
             thread.join().unwrap();
         }
 
-        assert_eq!(container.len(), 1);
+        assert_eq!(type_map.len(), 1);
     });
 }
