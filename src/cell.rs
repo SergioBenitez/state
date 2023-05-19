@@ -171,10 +171,10 @@ impl<T: Send + Sync> InitCell<T> {
     /// # use state::InitCell;
     /// static MY_GLOBAL: InitCell<&'static str> = InitCell::new();
     ///
-    /// assert_eq!(*MY_GLOBAL.get_or_set(|| "Hello, world!"), "Hello, world!");
+    /// assert_eq!(*MY_GLOBAL.get_or_init(|| "Hello, world!"), "Hello, world!");
     /// ```
     #[inline]
-    pub fn get_or_set<F: FnOnce() -> T>(&self, from: F) -> &T {
+    pub fn get_or_init<F: FnOnce() -> T>(&self, from: F) -> &T {
         if let Some(value) = self.try_get() {
             value
         } else {

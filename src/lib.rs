@@ -55,7 +55,7 @@
 //!     }
 //!
 //!     fn compute(&self) -> &DerivedValue {
-//!         self.cached.get_or_set(|| {
+//!         self.cached.get_or_init(|| {
 //!             let _value = &self.value;
 //!             unimplemented!("expensive computation with `self.value`")
 //!         })

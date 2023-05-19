@@ -43,7 +43,7 @@ impl ThreadIdManager {
 fn thread_id_manager() -> MutexGuard<'static, ThreadIdManager> {
     static THREAD_ID_MANAGER: InitCell<Mutex<ThreadIdManager>> = InitCell::new();
 
-    THREAD_ID_MANAGER.get_or_set(|| Mutex::new(ThreadIdManager::new())).lock().unwrap()
+    THREAD_ID_MANAGER.get_or_init(|| Mutex::new(ThreadIdManager::new())).lock().unwrap()
 }
 
 // Non-zero integer which is unique to the current thread while it is running.
