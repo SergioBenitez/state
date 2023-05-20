@@ -37,7 +37,7 @@ jobs:
           args: ${{ matrix.test.args }}
 
   check-msrv:
-    name: Check MSRV (1.32.0)
+    name: Check MSRV (1.61.0)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Sources
@@ -47,7 +47,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.32.0
+          toolchain: 1.61.0
           override: true
 
       - name: Check Compilation
