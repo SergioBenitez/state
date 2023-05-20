@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/state/0.5.3")]
+#![doc(html_root_url = "https://docs.rs/state/0.6.0-dev")]
 #![warn(missing_docs)]
 
 //! # Safe, Effortless `state` Management
@@ -16,7 +16,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! state = "0.5"
+//! state = "0.6.0-dev"
 //! ```
 //!
 //! Thread-local state management is not enabled by default. You can enable it
@@ -24,7 +24,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! state = { version = "0.5", features = ["tls"] }
+//! state = { version = "0.6.0-dev", features = ["tls"] }
 //! ```
 //!
 //! ## Use Cases

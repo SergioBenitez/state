@@ -3,7 +3,7 @@ use std::hash::Hasher;
 // This is a _super_ stupid hash. It just uses its input as the hash value. This
 // hash is meant to be used _only_ for "prehashed" values. In particular, we use
 // this so that hashing a TypeId is essentially a noop. This is because TypeIds
-// are already unique u64s.
+// are already unique integers.
 #[derive(Default)]
 pub struct IdentHash(u64);
 

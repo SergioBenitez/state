@@ -34,7 +34,7 @@ Include `state` in your `Cargo.toml` `[dependencies]`:
 
 ```toml
 [dependencies]
-state = "0.5"
+state = "0.6.0-dev"
 ```
 
 Thread-local state management is not enabled by default. You can enable it
@@ -42,12 +42,12 @@ via the `tls` feature:
 
 ```toml
 [dependencies]
-state = { version = "0.5", features = ["tls"] }
+state = { version = "0.6.0-dev", features = ["tls"] }
 ```
 
 ## MSRV
 
-The minimum supported Rust version is `1.32.0` as of `state` version `0.5.2`.
+The minimum supported Rust version is `1.61.0` as of `state` version `0.6`.
 
 ## Correctness
 

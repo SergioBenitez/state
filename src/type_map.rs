@@ -188,44 +188,7 @@ macro_rules! new {
     )
 }
 
-type TypeIdMap = HashMap<TypeId, AnyObject, BuildHasherDefault<IdentHash>>;
-
-/// FIXME: This is a hack so we can create a *mut dyn Any with a `const`. It
-/// simply erases `dyn Any`; `transmute` ensures that a `*mut dyn Any` and an
-/// `AnyObject` have the same size. The field order doesn't matter since we
-/// never read the fields directly: we just need the sizes to be the same.
-#[repr(C)]
-struct AnyObject {
-    data: *mut (),
-    vtable: *mut (),
-}
-
-impl AnyObject {
-    fn anonymize<T: 'static>(value: T) -> AnyObject {
-        let any: Box<dyn Any> = Box::new(value) as Box<dyn Any>;
-        let any: *mut dyn Any = Box::into_raw(any);
-        unsafe { std::mem::transmute(any) }
-    }
-
-    fn deanonymize<T: 'static>(&self) -> Option<&T> {
-        unsafe {
-            let any: *const *const dyn Any = self as *const Self as *const *const dyn Any;
-            let any: &dyn Any = &*(*any as *const dyn Any);
-            any.downcast_ref()
-        }
-    }
-}
-
-impl Drop for AnyObject {
-    fn drop(&mut self) {
-        unsafe {
-            let any: *mut *mut dyn Any = self as *mut Self as *mut *mut dyn Any;
-            let any: *mut dyn Any = *any;
-            let any: Box<dyn Any> = Box::from_raw(any);
-            drop(any);
-        }
-    }
-}
+type TypeIdMap = HashMap<TypeId, Box<dyn Any>, BuildHasherDefault<IdentHash>>;
 
 impl TypeMap<kind::SendSync> {
     /// Creates a new type map with no stored values.
@@ -516,7 +479,7 @@ impl<K: kind::Kind> TypeMap<K> {
         let type_id = TypeId::of::<T>();
         let already_set = map.contains_key(&type_id);
         if !already_set {
-            map.insert(type_id, AnyObject::anonymize(state));
+            map.insert(type_id, Box::new(state) as Box<dyn Any>);
         }
 
         self.unlock();
@@ -572,7 +535,7 @@ impl<K: kind::Kind> TypeMap<K> {
         // dropped until `self` is dropped: it is never replaced.
         unsafe {
             self.with_map_ref(|map| {
-                map.get(&TypeId::of::<T>()).and_then(|ptr| ptr.deanonymize())
+                map.get(&TypeId::of::<T>()).and_then(|ptr| ptr.downcast_ref())
             })
         }
     }

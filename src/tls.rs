@@ -65,7 +65,7 @@ impl<T: Send + 'static> LocalValue<T> {
 ///
 /// ```toml
 /// [dependencies]
-/// state = { version = "0.5", features = ["tls"] }
+/// state = { version = "0.6.0-dev", features = ["tls"] }
 /// ```
 ///
 /// # Example
