@@ -51,7 +51,7 @@
 //! impl Foo {
 //!     fn set_value(&mut self, v: Value) {
 //!         self.value = v;
-//!         self.cached = InitCell::new();
+//!         self.cached.reset();
 //!     }
 //!
 //!     fn compute(&self) -> &DerivedValue {
