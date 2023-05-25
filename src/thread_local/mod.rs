@@ -87,7 +87,7 @@ impl<T: Send> Default for ThreadLocal<T> {
 impl<T> Drop for ThreadLocal<T> {
     fn drop(&mut self) {
         unsafe {
-            Box::from_raw(self.table.load(Ordering::Relaxed));
+            let _ = Box::from_raw(self.table.load(Ordering::Relaxed));
         }
     }
 }
