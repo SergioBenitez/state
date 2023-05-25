@@ -1,11 +1,11 @@
 [package]
 name = "state"
-version = "0.6.0-dev"
+version = "0.6.0"
 authors = ["Sergio Benitez <sb@sergio.bz>"]
 description = """
 A library for safe and effortless global and thread-local state management.
 """
-documentation = "https://docs.rs/state/0.6.0-dev"
+documentation = "https://docs.rs/state/0.6.0"
 repository = "https://github.com/SergioBenitez/state"
 readme = "README.md"
 keywords = ["static", "tls", "state", "thread-local", "global"]
