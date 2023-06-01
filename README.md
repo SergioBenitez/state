@@ -10,8 +10,6 @@
 A Rust library for safe and effortless global and thread-local state management.
 
 ```rust
-extern crate state;
-
 static GLOBAL: state::InitCell<u32> = state::InitCell::new();
 
 GLOBAL.set(42);
@@ -24,7 +22,7 @@ This library can be used to easily implement:
   * Singletons, Init-Once Values
   * Global or Thread-Local Caches, Thunks
   * Dynamically-Initialized Thread-Local Data
-  * Type Maps, Type-Based TypeMaps
+  * Type Maps, Type-Based Maps
 
 See the [documentation](https://docs.rs/state) for more.
 

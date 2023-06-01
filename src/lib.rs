@@ -6,7 +6,7 @@
 //! This crate allows you to safely and effortlessly manage global and/or
 //! thread-local state. Three primitives are provided for state management:
 //!
-//!  * **[`struct@TypeMap`]:** Type-based storage for many values.
+//!  * **[`struct@TypeMap`]:** Type-based map for many values.
 //!  * **[`InitCell`]:** Thread-safe init-once storage for a single value.
 //!  * **[`LocalInitCell`]:** Thread-local init-once-per-thread cell.
 //!
